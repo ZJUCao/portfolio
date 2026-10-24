@@ -47,7 +47,7 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
                 <li key={item.href} className="relative">
                   <Link
                     href={item.href}
-                    className={`block rounded-full px-3 py-1.5 transition-colors ${
+                    className={`block whitespace-nowrap rounded-full px-2.5 py-1.5 transition-colors sm:px-3 ${
                       active ? "text-foreground" : "text-muted hover:text-foreground"
                     }`}
                   >
@@ -69,7 +69,7 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
             onClick={rememberChoice}
             hrefLang={other}
             aria-label={switchAria}
-            className="ml-2 rounded-full border border-line px-3 py-1 font-mono text-xs text-muted transition-colors hover:border-foreground hover:text-foreground"
+            className="ml-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1 font-mono text-xs sm:ml-2 sm:px-3 text-muted transition-colors hover:border-foreground hover:text-foreground"
           >
             {switchLabel}
           </Link>

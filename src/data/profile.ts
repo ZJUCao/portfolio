@@ -1,18 +1,9 @@
-// 站点上所有个人内容和界面文案都在这个文件里，改这里即可，页面代码不用动。
+// 站点上的个人内容和界面文案都在这个文件里，改这里即可，页面代码不用动。
+// 项目列表从 GitHub 自动获取，见 scripts/fetch-github.mjs 和 src/data/projects.ts。
 // 两种语言共用的信息（邮箱、链接、标签）写在 shared，需要翻译的写在 zh / en 里。
 
 import { notFound } from "next/navigation";
 import { hasLocale, type Locale } from "@/i18n";
-
-export type Project = {
-  slug: string;
-  title: string;
-  summary: string;
-  tags: string[];
-  year: string;
-  featured?: boolean;
-  links?: { label: string; href: string }[];
-};
 
 export type Experience = {
   period: string;
@@ -33,10 +24,11 @@ const shared = {
 const zh = {
   name: "曹宇",
   title: "软件工程师",
-  tagline: "五年工业界开发经验，从华为的分布式中间件到 3D 工程软件；现在专注图形渲染、游戏引擎与计算机视觉。",
+  tagline: "五年软件开发经验，主攻 C++、游戏引擎架构与计算机图形学，熟悉 ECS 架构和碰撞检测。",
   about: [
-    "我本科在浙江大学读英语文学，选修编程课时喜欢上了写代码，毕业后进入华为杭州研究所做全栈开发，之后在初创公司搭建 SaaS 后端，又在苏交科集团做了三年 BIM 3D 工程软件开发。",
-    "现在我在 Northeastern University 读计算机科学硕士，课程和项目集中在计算机图形学、游戏引擎和计算机视觉：写过 KD-Tree 加速的光线追踪渲染器、基于 ECS 的游戏，也做过实时目标检测应用。",
+    "我是曹宇，有五年软件开发经验，主攻 C++、游戏引擎架构与计算机图形学，熟悉 ECS 架构和碰撞检测。我习惯把复杂需求拆成可以独立验证的模块，一个人走完方案设计、编码、调试到性能优化的全过程：在 Arcane Survival 中，我用 Flow Field 让 200+ 个敌人稳定运行在 240 FPS。",
+    "我上手新技术栈很快：本科读的是英语文学，转行后先后做过华为的分布式中间件、初创公司的 SaaS 后端和苏交科的 BIM 3D 工程软件，每次都能很快接手。我重视代码规范和工程化，在苏交科主导制定了团队的 C# 规范和代码审查流程，组件复用率因此提升了 30%。",
+    "现在我在 Northeastern University 读计算机科学硕士，希望继续深耕图形渲染与游戏引擎方向。",
   ],
   skills: {
     编程语言: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
@@ -91,50 +83,6 @@ const zh = {
       points: ["计算机选修：C 程序设计 (5.0/5.0)、Python 程序设计 (5.0/5.0)、面向对象程序设计 (4.5/5.0)"],
     },
   ] as Experience[],
-  projects: [
-    {
-      slug: "arcane-survival",
-      title: "Arcane Survival",
-      summary:
-        "游戏引擎课程项目。基于 ECS 架构拆分生成、索敌、移动、碰撞四个系统；用 Reverse DFS 驱动的 Flow Field 调度 200+ 追猎敌人，帧率稳定在 240 FPS；JSON / Lua 数据驱动配置，玩法参数无需重新编译即可调整。",
-      tags: ["ECS", "Flow Field", "Lua", "Game Engine"],
-      year: "2026",
-      featured: true,
-    },
-    {
-      slug: "nutriscan",
-      title: "NutriScan 实时营养追踪",
-      summary:
-        "计算机视觉课程项目。摄像头采集 → YOLO 目标检测 → 营养数据库匹配 → UI 渲染的端到端实时系统；升级到 YOLOv8s 并重新设计跨类别 NMS 与时序平滑，mAP 从 0.711 提升到 0.871，保持 30 FPS。",
-      tags: ["Python", "YOLOv8", "OpenCV"],
-      year: "2026",
-      featured: true,
-    },
-    {
-      slug: "ray-tracer",
-      title: "光线追踪渲染器",
-      summary:
-        "计算机图形学课程项目。离线 CPU 光线追踪渲染器，用 KD-Tree 空间加速结构加包围盒剪枝，把射线-图元求交从 O(n) 降到 O(log n)，渲染性能提升 100 倍以上。",
-      tags: ["C++", "Ray Tracing", "KD-Tree"],
-      year: "2025",
-      featured: true,
-    },
-    {
-      slug: "job-assistant",
-      title: "求职助手",
-      summary:
-        "一组完全在本机运行的求职 Agent：按岗位 JD 优化简历，并从多个来源找岗位、和个人经历做匹配。个人数据不出本机，测试禁止访问外网。",
-      tags: ["Python", "LLM Agent", "Ollama", "LaTeX"],
-      year: "2026",
-    },
-    {
-      slug: "portfolio",
-      title: "个人作品集",
-      summary: "就是这个网站。Next.js 静态导出，中英双语，Tailwind CSS 排版，Motion 做滚动动效，部署在 Vercel。",
-      tags: ["Next.js", "TypeScript", "Tailwind CSS", "i18n"],
-      year: "2026",
-    },
-  ] as Project[],
   ui: {
     nav: { projects: "项目", about: "关于", contact: "联系" },
     switchLabel: "EN",
@@ -145,7 +93,25 @@ const zh = {
     featured: "精选项目",
     viewAll: "全部 →",
     projectsTitle: "项目",
-    projectsIntro: "我做过的一些东西，按时间倒序。",
+    projectsIntro: "我在 GitHub 上的公开项目，按最近更新排序，每天自动同步。",
+    noDescription: "这个仓库还没有简介。",
+    noProjects: "GitHub 上暂时还没有公开项目。",
+    updated: "更新于",
+    created: "创建于",
+    stars: "Star",
+    forks: "Fork",
+    license: "许可证",
+    languages: "语言构成",
+    topics: "主题",
+    details: "仓库信息",
+    viewOnGithub: "GitHub 仓库",
+    liveDemo: "在线演示",
+    demoVideo: "演示视频",
+    readme: "项目说明",
+    noReadme: "这个仓库还没有 README。",
+    backToProjects: "← 全部项目",
+    prevProject: "上一个",
+    nextProject: "下一个",
     aboutTitle: "关于我",
     workTitle: "工作经历",
     educationTitle: "教育经历",
@@ -158,10 +124,11 @@ const zh = {
 const en: typeof zh = {
   name: "Yu Cao",
   title: "Software Engineer",
-  tagline: "Five years of industry experience, from distributed middleware at Huawei to 3D engineering software. Now focused on graphics, game engines, and computer vision.",
+  tagline: "Five years of software engineering, focused on C++, game engine architecture, and computer graphics — with hands-on ECS and collision detection.",
   about: [
-    "I studied English Literature at Zhejiang University and fell for programming in my CS electives. After graduating I joined Huawei's Hangzhou Research Institute as a full-stack engineer, built a SaaS backend from scratch at a startup, then spent three years developing BIM 3D engineering software at JSTI Group.",
-    "I'm now pursuing an M.S. in Computer Science at Northeastern University, focused on computer graphics, game engines, and computer vision — a KD-Tree-accelerated ray tracer, an ECS-based game, and a real-time object detection app.",
+    "I'm Yu Cao, a software engineer with five years of experience, focused on C++, game engine architecture, and computer graphics, with hands-on work in ECS and collision detection. I break complex requirements into modules I can verify independently, and own the whole path from design and implementation to debugging and performance tuning — in Arcane Survival, a flow field keeps 200+ enemies running at a steady 240 FPS.",
+    "I pick up new stacks quickly. I studied English Literature, then moved into software and worked on distributed middleware at Huawei, a SaaS backend at a startup, and BIM 3D engineering software at JSTI Group, ramping up fast each time. I care about code standards and engineering discipline: at JSTI I led the team's C# coding standards and review process, raising component reuse by 30%.",
+    "I'm now pursuing an M.S. in Computer Science at Northeastern University, and plan to keep going deep on rendering and game engines.",
   ],
   skills: {
     Languages: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
@@ -219,50 +186,6 @@ const en: typeof zh = {
       points: ["CS electives: C Programming (5.0/5.0), Python Programming (5.0/5.0), Object-Oriented Programming (4.5/5.0)"],
     },
   ],
-  projects: [
-    {
-      slug: "arcane-survival",
-      title: "Arcane Survival",
-      summary:
-        "Game engine course project. Gameplay built on an ECS split into spawning, targeting, movement, and collision systems; a Reverse-DFS-driven flow field routes 200+ chasing enemies at a stable 240 FPS; JSON/Lua data-driven config lets gameplay change without recompiling.",
-      tags: ["ECS", "Flow Field", "Lua", "Game Engine"],
-      year: "2026",
-      featured: true,
-    },
-    {
-      slug: "nutriscan",
-      title: "NutriScan",
-      summary:
-        "Computer vision course project. A real-time pipeline from camera capture to YOLO detection, nutrition lookup, and UI; upgrading to YOLOv8s with redesigned cross-class NMS and temporal smoothing raised mAP from 0.711 to 0.871 at 30 FPS.",
-      tags: ["Python", "YOLOv8", "OpenCV"],
-      year: "2026",
-      featured: true,
-    },
-    {
-      slug: "ray-tracer",
-      title: "Ray Tracer",
-      summary:
-        "Computer graphics course project. An offline CPU ray tracer whose KD-Tree acceleration structure with bounding-box pruning cuts ray–primitive intersection from O(n) to O(log n), speeding up rendering by more than 100x.",
-      tags: ["C++", "Ray Tracing", "KD-Tree"],
-      year: "2025",
-      featured: true,
-    },
-    {
-      slug: "job-assistant",
-      title: "Job Assistant",
-      summary:
-        "A set of job-search agents that run entirely on-device: tailoring résumés to a job description, and sourcing roles from several sites to match against my experience. Personal data never leaves the machine; tests are blocked from the network.",
-      tags: ["Python", "LLM Agent", "Ollama", "LaTeX"],
-      year: "2026",
-    },
-    {
-      slug: "portfolio",
-      title: "Portfolio",
-      summary: "This site. A bilingual Next.js static export, styled with Tailwind CSS, animated with Motion, deployed on Vercel.",
-      tags: ["Next.js", "TypeScript", "Tailwind CSS", "i18n"],
-      year: "2026",
-    },
-  ],
   ui: {
     nav: { projects: "Projects", about: "About", contact: "Contact" },
     switchLabel: "中文",
@@ -273,7 +196,25 @@ const en: typeof zh = {
     featured: "Featured projects",
     viewAll: "All →",
     projectsTitle: "Projects",
-    projectsIntro: "Things I've built, newest first.",
+    projectsIntro: "My public projects on GitHub, most recently updated first. Synced daily.",
+    noDescription: "No description yet.",
+    noProjects: "No public projects on GitHub yet.",
+    updated: "Updated",
+    created: "Created",
+    stars: "Stars",
+    forks: "Forks",
+    license: "License",
+    languages: "Languages",
+    topics: "Topics",
+    details: "Repository",
+    viewOnGithub: "GitHub repo",
+    liveDemo: "Live demo",
+    demoVideo: "Demo video",
+    readme: "README",
+    noReadme: "This repository has no README yet.",
+    backToProjects: "← All projects",
+    prevProject: "Previous",
+    nextProject: "Next",
     aboutTitle: "About me",
     workTitle: "Work Experience",
     educationTitle: "Education",

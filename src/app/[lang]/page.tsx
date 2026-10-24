@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ProjectCard } from "@/components/ProjectCard";
 import { Reveal } from "@/components/Reveal";
 import { contentFor } from "@/data/profile";
+import { getProjects } from "@/data/projects";
 import { alternatesFor } from "@/i18n";
 
 export const metadata: Metadata = { alternates: alternatesFor() };
@@ -10,7 +11,7 @@ export const metadata: Metadata = { alternates: alternatesFor() };
 export default async function Home({ params }: PageProps<"/[lang]">) {
   const { lang } = await params;
   const c = contentFor(lang);
-  const featured = c.projects.filter((p) => p.featured);
+  const featured = getProjects(c.locale).filter((p) => p.featured);
 
   return (
     <>
@@ -36,6 +37,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
         </Reveal>
       </section>
 
+      {featured.length > 0 && (
       <section className="mt-28">
         <Reveal className="flex items-baseline justify-between">
           <h2 className="text-2xl font-semibold tracking-tight">{c.ui.featured}</h2>
@@ -44,11 +46,12 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
         <div className="mt-8 grid gap-4 sm:grid-cols-2">
           {featured.map((project, i) => (
             <Reveal key={project.slug} delay={i * 0.06}>
-              <ProjectCard project={project} />
+              <ProjectCard project={project} c={c} />
             </Reveal>
           ))}
         </div>
       </section>
+      )}
     </>
   );
 }

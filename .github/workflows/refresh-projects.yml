@@ -1,0 +1,25 @@
+# 每天触发一次 Vercel 重新部署，构建时会重新从 GitHub 拉取公开仓库，
+# 新公开的项目因此最晚一天后出现在网站上。
+#
+# 需要在本仓库 Settings → Secrets and variables → Actions 里添加 VERCEL_DEPLOY_HOOK：
+# 它来自 Vercel 项目的 Settings → Git → Deploy Hooks。没配置时这个任务会直接跳过。
+name: Refresh projects from GitHub
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 每天 UTC 9:00（北京时间 17:00）
+  workflow_dispatch: # 也可以在 Actions 页面手动运行
+
+jobs:
+  redeploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Vercel deploy hook
+        env:
+          VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$VERCEL_DEPLOY_HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK is not set; skipping."
+            exit 0
+          fi
+          curl -fsS -X POST "$VERCEL_DEPLOY_HOOK"

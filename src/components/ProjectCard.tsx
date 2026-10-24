@@ -1,29 +1,35 @@
-import type { Project } from "@/data/profile";
+import Link from "next/link";
+import { LanguageDot } from "@/components/LanguageDot";
+import type { Content } from "@/data/profile";
+import { formatMonth, type Project } from "@/data/projects";
 
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({ project, c }: { project: Project; c: Content }) {
   return (
-    <article className="group h-full rounded-2xl border border-line bg-surface p-6 transition-colors hover:border-accent">
+    <Link
+      href={`/${c.locale}/projects/${project.slug}`}
+      className="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 transition-colors hover:border-accent"
+    >
       <div className="flex items-baseline justify-between gap-4">
         <h3 className="text-lg font-semibold tracking-tight group-hover:text-accent">{project.title}</h3>
-        <span className="font-mono text-xs text-muted">{project.year}</span>
+        <span className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-accent">→</span>
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-muted">{project.summary}</p>
-      <ul className="mt-5 flex flex-wrap gap-2">
-        {project.tags.map((tag) => (
-          <li key={tag} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-xs text-muted">
-            {tag}
-          </li>
-        ))}
-      </ul>
-      {project.links && (
-        <div className="mt-5 flex gap-4 text-sm">
-          {project.links.map((link) => (
-            <a key={link.href} href={link.href} target="_blank" rel="noreferrer" className="underline-offset-4 hover:underline">
-              {link.label} ↗
-            </a>
+      <p className="mt-3 flex-1 text-sm leading-relaxed text-muted">{project.summary ?? c.ui.noDescription}</p>
+      {project.topics.length > 0 && (
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {project.topics.map((topic) => (
+            <li key={topic} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-xs text-muted">
+              {topic}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </article>
+      <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-muted">
+        {project.language && <LanguageDot name={project.language} />}
+        {project.stars > 0 && <span>★ {project.stars}</span>}
+        <span>
+          {c.ui.updated} {formatMonth(c.locale, project.pushedAt)}
+        </span>
+      </div>
+    </Link>
   );
 }

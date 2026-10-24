@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "fetch-github": "node scripts/fetch-github.mjs",
+    "predev": "node scripts/fetch-github.mjs",
+    "prebuild": "node scripts/fetch-github.mjs"
   },
   "dependencies": {
     "motion": "^14.6.0",
@@ -16,6 +19,7 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
+    "@tailwindcss/typography": "^0.5.20",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
