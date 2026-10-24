@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // 构建时生成纯静态文件到 out/，不需要 Node 服务器
+  output: "export",
   turbopack: {
     rules: {
       "*.css": {
