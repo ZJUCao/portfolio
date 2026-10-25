@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude Code 会把会话的 worktree 建在 .claude/worktrees 里，那是另一份仓库副本和它的构建产物
+    ".claude/**",
   ]),
 ]);
 
