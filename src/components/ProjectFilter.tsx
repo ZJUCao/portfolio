@@ -77,7 +77,7 @@ function FilterView({
         </Reveal>
       )}
       {/* 切换分类时，留下的卡片滑到新位置，移走的淡出，新出现的由 Reveal 淡入 */}
-      <div className={`relative grid gap-4 sm:grid-cols-2 ${showFilter ? "mt-6" : "mt-12"}`}>
+      <div className={`relative grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 ${showFilter ? "mt-6" : "mt-12"}`}>
         <AnimatePresence mode="popLayout">
           {visible.map((item, i) => (
             <motion.div

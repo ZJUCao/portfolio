@@ -43,7 +43,7 @@ export default async function Home({ params }: PageProps<"/[lang]">) {
           <h2 className="text-2xl font-semibold tracking-tight">{c.ui.featured}</h2>
           <Link href={`/${lang}/projects`} className="text-sm text-muted hover:text-foreground">{c.ui.viewAll}</Link>
         </Reveal>
-        <div className="mt-8 grid gap-4 sm:grid-cols-2">
+        <div className="mt-8 grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2">
           {featured.map((project, i) => (
             <Reveal key={project.slug} delay={i * 0.06}>
               <ProjectCard project={project} c={c} />
