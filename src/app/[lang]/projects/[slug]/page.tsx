@@ -4,7 +4,7 @@ import { languageColor, LanguageDot } from "@/components/LanguageDot";
 import { Reveal } from "@/components/Reveal";
 import { contentFor } from "@/data/profile";
 import { formatMonth, getProject, projectSlugs } from "@/data/projects";
-import { alternatesFor } from "@/i18n";
+import { alternatesFor, htmlLang } from "@/i18n";
 
 // 静态导出：每个 GitHub 仓库在每种语言下生成一个详情页；新仓库要等下一次构建才出现
 export const dynamicParams = false;
@@ -44,7 +44,13 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
 
       <header className="mt-8">
         <Reveal delay={0.04}>
-          <h1 className="break-words text-4xl font-semibold tracking-tight sm:text-5xl">{project.title}</h1>
+          <Link
+            href={`/${lang}/projects?category=${project.category.id}`}
+            className="font-mono text-sm text-accent hover:underline"
+          >
+            {project.category.label}
+          </Link>
+          <h1 className="mt-3 break-words text-4xl font-semibold tracking-tight sm:text-5xl">{project.title}</h1>
         </Reveal>
         <Reveal delay={0.08}>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{project.summary ?? c.ui.noDescription}</p>
@@ -98,9 +104,18 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
         <Reveal className="min-w-0">
           <section className="rounded-2xl border border-line bg-surface p-6 sm:p-8">
             <h2 className="font-mono text-xs uppercase tracking-wider text-muted">{c.ui.readme}</h2>
-            {project.readmeHtml ? (
-              // README 是 GitHub 渲染并清理过的 HTML，只来自本人的公开仓库
-              <div className="readme prose prose-sm mt-6 max-w-none sm:prose-base" dangerouslySetInnerHTML={{ __html: project.readmeHtml }} />
+            {project.readme ? (
+              <>
+                {project.readme.lang && project.readme.lang !== c.locale && (
+                  <p className="mt-3 text-sm text-muted">{c.ui.readmeOtherLanguage}</p>
+                )}
+                {/* README 是 GitHub 渲染并清理过的 HTML，只来自本人的公开仓库 */}
+                <div
+                  lang={project.readme.lang ? htmlLang(project.readme.lang) : undefined}
+                  className="readme prose prose-sm mt-6 max-w-none sm:prose-base"
+                  dangerouslySetInnerHTML={{ __html: project.readme.html }}
+                />
+              </>
             ) : (
               <p className="mt-6 text-muted">{c.ui.noReadme}</p>
             )}

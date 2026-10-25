@@ -9,7 +9,8 @@ export function ProjectCard({ project, c }: { project: Project; c: Content }) {
       href={`/${c.locale}/projects/${project.slug}`}
       className="group flex h-full flex-col rounded-2xl border border-line bg-surface p-6 transition-colors hover:border-accent"
     >
-      <div className="flex items-baseline justify-between gap-4">
+      <p className="font-mono text-xs text-muted">{project.category.label}</p>
+      <div className="mt-2 flex items-baseline justify-between gap-4">
         <h3 className="text-lg font-semibold tracking-tight group-hover:text-accent">{project.title}</h3>
         <span className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-accent">→</span>
       </div>

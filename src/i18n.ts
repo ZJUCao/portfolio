@@ -5,6 +5,9 @@ export const defaultLocale: Locale = "en";
 export const hasLocale = (value: string): value is Locale =>
   (locales as readonly string[]).includes(value);
 
+// HTML lang 属性的值
+export const htmlLang = (locale: Locale) => (locale === "zh" ? "zh-CN" : "en");
+
 // 告诉搜索引擎同一页面的其他语言版本，path 是去掉语言前缀后的路径，如 "/about"
 export const alternatesFor = (path = "") => ({
   languages: Object.fromEntries(locales.map((l) => [l, `/${l}${path}`])),

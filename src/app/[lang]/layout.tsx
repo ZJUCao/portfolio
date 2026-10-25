@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Nav } from "@/components/Nav";
 import { contentFor } from "@/data/profile";
-import { locales } from "@/i18n";
+import { htmlLang, locales } from "@/i18n";
 import "../globals.css";
 
 const geistSans = Geist({
@@ -37,7 +37,7 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
 
   return (
     <html
-      lang={c.locale === "zh" ? "zh-CN" : "en"}
+      lang={htmlLang(c.locale)}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
