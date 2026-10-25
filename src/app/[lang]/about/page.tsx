@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Reveal } from "@/components/Reveal";
 import { contentFor, type Experience } from "@/data/profile";
+import { getProjects } from "@/data/projects";
+import { skillsOf } from "@/data/skills";
 import { alternatesFor } from "@/i18n";
 
 export async function generateMetadata({ params }: PageProps<"/[lang]/about">): Promise<Metadata> {
@@ -40,6 +42,7 @@ function Timeline({ title, items }: { title: string; items: Experience[] }) {
 export default async function AboutPage({ params }: PageProps<"/[lang]/about">) {
   const { lang } = await params;
   const c = contentFor(lang);
+  const skills = skillsOf(c.locale, c.skills, getProjects(c.locale));
 
   return (
     <>
@@ -60,11 +63,11 @@ export default async function AboutPage({ params }: PageProps<"/[lang]/about">) 
           <h2 className="text-2xl font-semibold tracking-tight">{c.ui.skillsTitle}</h2>
         </Reveal>
         <div className="mt-8 grid gap-6 sm:grid-cols-3">
-          {Object.entries(c.skills).map(([group, list], i) => (
-            <Reveal key={group} delay={i * 0.06}>
-              <h3 className="text-sm font-medium">{group}</h3>
+          {skills.map((group, i) => (
+            <Reveal key={group.id} delay={i * 0.06}>
+              <h3 className="text-sm font-medium">{group.label}</h3>
               <ul className="mt-3 flex flex-wrap gap-2">
-                {list.map((skill) => (
+                {group.skills.map((skill) => (
                   <li key={skill} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-xs text-muted">
                     {skill}
                   </li>

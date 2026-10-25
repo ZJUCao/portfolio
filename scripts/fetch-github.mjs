@@ -18,7 +18,7 @@ const OUT = join(dirname(fileURLToPath(import.meta.url)), "../src/data/github.ge
 const API = "https://api.github.com";
 const HTML = "application/vnd.github.html+json";
 // 快照的数据格式改动时加 1。本地拉取失败时只沿用同一格式的旧快照，格式不同页面代码读不了
-const FORMAT = 2;
+const FORMAT = 3;
 
 const headers = {
   "User-Agent": `${USER}-portfolio`,
@@ -28,9 +28,19 @@ const headers = {
 
 async function get(path, accept = "application/vnd.github+json") {
   const res = await fetch(`${API}${path}`, { headers: { ...headers, Accept: accept } });
-  if (res.status === 404) return null;
+  // 404：没有这个文件；409：空仓库，还没有任何提交
+  if (res.status === 404 || res.status === 409) return null;
   if (!res.ok) throw new Error(`GitHub ${path} → ${res.status} ${await res.text()}`);
   return accept.includes("html") ? res.text() : res.json();
+}
+
+// 仓库里某个文件的原始内容。raw.githubusercontent.com 不占 API 的额度
+async function rawFile(repo, path) {
+  const url = `https://raw.githubusercontent.com/${repo.full_name}/${repo.default_branch}/${path.split("/").map(encodeURIComponent).join("/")}`;
+  const res = await fetch(url, { headers: { "User-Agent": headers["User-Agent"] } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${url} → ${res.status}`);
+  return res.text();
 }
 
 // README 里的相对链接在 GitHub 上由前端补全，搬到这里要换成绝对地址：
@@ -119,14 +129,13 @@ const readmeLangOf = (path) => {
 };
 
 // 返回仓库的各语言 README：GitHub 默认显示的那份排第一，后面是根目录里其他语言的版本。
-// 默认 README（如 README.md）的语言看内容判断，其他版本看文件名
-async function fetchReadmes(repo) {
-  const [readme, root] = await Promise.all([
-    get(`/repos/${repo.full_name}/readme`, HTML),
-    get(`/repos/${repo.full_name}/contents/`),
-  ]);
+// 默认 README（如 README.md）的语言看内容判断，其他版本看文件名。entries 是仓库里的全部文件和目录
+async function fetchReadmes(repo, entries) {
+  const readme = await get(`/repos/${repo.full_name}/readme`, HTML);
   const defaultPath = readme?.match(/data-path="([^"]+)"/)?.[1] ?? "README.md";
-  const variants = (root ?? []).filter((f) => f.type === "file" && f.path !== defaultPath && readmeLangOf(f.path));
+  const variants = entries.filter(
+    (f) => f.type === "blob" && !f.path.includes("/") && f.path !== defaultPath && readmeLangOf(f.path),
+  );
   const files = [
     ...(readme ? [{ path: defaultPath, html: readme }] : []),
     ...(await Promise.all(
@@ -149,6 +158,110 @@ async function fetchReadmes(repo) {
     });
 }
 
+// 以下收集仓库用到的库和工具，网站据此识别项目的技术栈（对照表在 src/data/skills.ts）。
+
+// 放第三方代码的目录。里面的依赖声明属于那些库自己，不算；
+// 但它下一层的目录名就是库名（如 third_party/glad、external/imgui，git submodule 也一样），算作依赖
+const VENDOR_DIR = /^(third[_-]?party|3rdparty|externals?|extern|vendors?|deps|libs)$/i;
+
+// 依赖声明文件（按文件名）和从内容里取依赖名的方法。只看仓库根目录和下一层
+const MANIFESTS = [
+  [/^package\.json$/i, (text) => {
+    const pkg = JSON.parse(text);
+    return Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+  }],
+  [/^requirements.*\.(txt|in)$/i, (text) => [...text.matchAll(/^\s*([a-z0-9][\w.-]*)\s*(?=[[<>=!~;@#]|$)/gim)].map((m) => m[1])],
+  [/^pyproject\.toml$/i, pyprojectDeps],
+  [/^(CMakeLists\.txt|.+\.cmake)$/i, cmakeDeps],
+  [/^vcpkg\.json$/i, (text) => (JSON.parse(text).dependencies ?? []).map((d) => (typeof d === "string" ? d : d.name))],
+];
+
+// 有这些文件就说明用了某样技术
+const MARKERS = [
+  [/(^|\/)(Dockerfile|(docker-)?compose\.ya?ml)$/i, "docker"],
+  [/^\.github\/workflows\/[^/]+\.ya?ml$/, "github-actions"],
+  [/(^|\/)ProjectSettings\/ProjectVersion\.txt$/, "unity"],
+  [/\.uproject$/, "unreal-engine"],
+  [/(^|\/)project\.godot$/, "godot"],
+];
+
+// 去掉 # 开头的注释（pyproject.toml 和 CMake 都用 #），但不动 URL 里的 #，如 glfw#3.4
+const stripComments = (text) => text.replace(/(^|\s)#.*$/gm, "$1");
+
+// pyproject.toml：[project] 的 dependencies、[project.optional-dependencies] 和 [dependency-groups] 里的包，
+// 以及 Poetry 的 [tool.poetry.dependencies]、[tool.poetry.group.*.dependencies] 里的键
+function pyprojectDeps(text) {
+  const packages = (list) => [...list.matchAll(/["']([a-z0-9][\w.-]*)/gi)].map((m) => m[1]);
+  return stripComments(text)
+    .split(/^(?=\[)/m)
+    .flatMap((section) => {
+      const header = section.match(/^\[+\s*([^\]]+?)\s*\]/)?.[1];
+      if (header === "project") return packages(section.match(/^\s*dependencies\s*=\s*\[([\s\S]*?)\]\s*$/m)?.[1] ?? "");
+      if (header === "project.optional-dependencies" || header === "dependency-groups") {
+        return packages(section.slice(section.indexOf("]") + 1));
+      }
+      if (/^tool\.poetry\.(.+\.)?dependencies$/.test(header)) return [...section.matchAll(/^\s*([\w.-]+)\s*=/gm)].map((m) => m[1]);
+      return [];
+    });
+}
+
+// CMake：find_package、FetchContent_Declare、CPMAddPackage 引入的库，以及 target_link_libraries 链接的库（取 :: 前面的名字）
+function cmakeDeps(text) {
+  return [...stripComments(text).matchAll(/\b(find_package|FetchContent_Declare|CPMAddPackage|target_link_libraries)\s*\(([^)]*)\)/gi)]
+    .flatMap(([, command, args]) => {
+      const words = args.trim().split(/\s+/);
+      switch (command.toLowerCase()) {
+        case "target_link_libraries":
+          // 第一个词是自己的目标；跳过 PRIVATE 一类关键字、${变量} 和生成器表达式
+          return words
+            .slice(1)
+            .filter((w) => !/^(PRIVATE|PUBLIC|INTERFACE|LINK_\w+|debug|optimized|general)$|[$<>]/.test(w))
+            .map((w) => w.split("::")[0]);
+        case "cpmaddpackage":
+          // CPMAddPackage(NAME glfw ...) 或 CPMAddPackage("gh:glfw/glfw#3.4")
+          return [args.match(/\bNAME\s+"?([\w.-]+)/)?.[1] ?? args.match(/"\w+:(?:[^/"]+\/)?([\w.-]+)/)?.[1]];
+        default:
+          return [words[0]];
+      }
+    })
+    .filter(Boolean);
+}
+
+// 仓库用到的库和工具的名字（小写）。entries 是仓库里的全部文件和目录
+async function fetchDependencies(repo, entries) {
+  const dirsOf = (path) => path.split("/").slice(0, -1);
+  const own = entries.filter((f) => !dirsOf(f.path).some((dir) => VENDOR_DIR.test(dir)));
+  const blobs = new Set(own.filter((f) => f.type === "blob").map((f) => f.path));
+  const manifests = [...blobs]
+    // requirements.txt 旁边有同名的 .in 时只读 .in：.txt 是用 .in 生成的，连间接依赖都列在里面
+    .filter((path) => path.split("/").length <= 2 && !(/\.txt$/i.test(path) && blobs.has(path.replace(/\.txt$/i, ".in"))))
+    .map((path) => [path, MANIFESTS.find(([name]) => name.test(path.split("/").pop()))?.[1]])
+    .filter(([, parse]) => parse);
+
+  const declared = await Promise.all(
+    manifests.map(async ([path, parse]) => {
+      const text = await rawFile(repo, path);
+      try {
+        return text ? parse(text) : [];
+      } catch (err) {
+        // 写错了的文件不该拦住整个网站的构建，跳过它
+        console.warn(`! Skipped ${repo.full_name}/${path}: ${err.message}`);
+        return [];
+      }
+    }),
+  );
+  // 第三方目录下一层的目录，不算第三方库自己又带的第三方目录
+  const vendored = entries
+    .filter((f) => f.type !== "blob")
+    .map((f) => f.path.split("/"))
+    .filter((parts) => VENDOR_DIR.test(parts.at(-2) ?? "") && !parts.slice(0, -2).some((dir) => VENDOR_DIR.test(dir)))
+    // 目录名可能带版本号，如 glfw-3.4，两种写法都留着
+    .flatMap((parts) => [parts.at(-1), parts.at(-1).replace(/[-_.]?v?\d+(\.\d+)*$/, "")]);
+  const marked = MARKERS.filter(([file]) => [...blobs].some((path) => file.test(path))).map(([, name]) => name);
+
+  return [...new Set([...declared.flat(), ...vendored, ...marked].filter(Boolean).map((n) => n.toLowerCase()))].sort();
+}
+
 async function fetchRepos() {
   const repos = await get(`/users/${USER}/repos?per_page=100&type=owner&sort=pushed`);
   if (!repos) throw new Error(`GitHub user ${USER} not found`);
@@ -160,7 +273,12 @@ async function fetchRepos() {
 
   return Promise.all(
     visible.map(async (r) => {
-      const [languages, readmes] = await Promise.all([get(`/repos/${r.full_name}/languages`), fetchReadmes(r)]);
+      const [languages, tree] = await Promise.all([
+        get(`/repos/${r.full_name}/languages`),
+        get(`/repos/${r.full_name}/git/trees/${encodeURIComponent(r.default_branch)}?recursive=1`),
+      ]);
+      const entries = tree?.tree ?? []; // 空仓库没有文件
+      const [readmes, dependencies] = await Promise.all([fetchReadmes(r, entries), fetchDependencies(r, entries)]);
       return {
         name: r.name,
         url: r.html_url,
@@ -170,6 +288,7 @@ async function fetchRepos() {
         homepage: r.homepage || null,
         language: r.language,
         languages: languages ?? {},
+        dependencies,
         topics: r.topics ?? [],
         stars: r.stargazers_count,
         forks: r.forks_count,

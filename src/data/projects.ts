@@ -5,6 +5,7 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@/i18n";
 import snapshot from "./github.generated.json";
+import { stackOf } from "./skills";
 
 // scripts/fetch-github.mjs 写出的数据格式。显式声明，避免类型随抓到的数据变化
 type GithubReadme = {
@@ -22,6 +23,7 @@ type GithubRepo = {
   homepage: string | null;
   language: string | null;
   languages: Record<string, number>;
+  dependencies: string[]; // 依赖声明文件、第三方库目录等处收集到的库和工具名，小写
   topics: string[];
   stars: number;
   forks: number;
@@ -90,6 +92,7 @@ type Override = {
   zh?: Localized;
   en?: Localized;
   category?: CategoryId;
+  // 首页精选：true 一定上精选；false 不上，也不会被自动补上；不写时可能被自动补上，见 FEATURED_COUNT
   featured?: boolean;
   hidden?: boolean;
   // 演示视频：中文页优先用 B 站，英文页优先用 YouTube，只有一个就两边都用它
@@ -112,6 +115,7 @@ const overrides: Record<string, Override> = {
   },
   portfolio: {
     category: "web",
+    featured: false, // 访客正在看的就是它，不必再放进精选
     zh: {
       title: "个人作品集",
       summary: "就是这个网站。Next.js 静态导出，中英双语，项目从 GitHub 自动同步，部署在 Vercel。",
@@ -125,8 +129,9 @@ const overrides: Record<string, Override> = {
   "SceneGraph-Renderer": { category: "graphics" },
 };
 
-// 首页「精选项目」没有手动标记时，取最近更新的几个
-const FEATURED_FALLBACK = 3;
+// 首页「精选项目」至少放几个：overrides 里标了 featured: true 的都放，不够这个数时
+// 用最新发布（按仓库创建时间）、又没标 featured: false 的项目补齐。首页一行两个，取偶数排得整齐
+const FEATURED_COUNT = 4;
 
 export type Project = {
   slug: string;
@@ -137,6 +142,7 @@ export type Project = {
   homepage: string | null;
   language: string | null;
   languages: { name: string; percent: number }[];
+  stack: string[]; // 识别出的技术栈，见 skills.ts
   topics: string[];
   stars: number;
   forks: number;
@@ -215,6 +221,7 @@ export function getProjects(locale: Locale): Project[] {
         homepage: repo.homepage,
         language: repo.language,
         languages: toPercentages(repo.languages),
+        stack: stackOf(locale, [...Object.keys(repo.languages), ...repo.topics, ...repo.dependencies]),
         topics: repo.topics,
         stars: repo.stars,
         forks: repo.forks,
@@ -228,9 +235,12 @@ export function getProjects(locale: Locale): Project[] {
     })
     .sort((a, b) => b.pushedAt.localeCompare(a.pushedAt));
 
-  if (!projects.some((p) => p.featured)) {
-    projects.slice(0, FEATURED_FALLBACK).forEach((p) => (p.featured = true));
-  }
+  const missing = FEATURED_COUNT - projects.filter((p) => p.featured).length;
+  projects
+    .filter((p) => !p.featured && overrides[p.slug]?.featured !== false)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, Math.max(0, missing))
+    .forEach((p) => (p.featured = true));
   return projects;
 }
 

@@ -142,6 +142,19 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
               </section>
             )}
 
+            {project.stack.length > 0 && (
+              <section>
+                <h2 className="text-sm font-medium">{c.ui.stack}</h2>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {project.stack.map((tech) => (
+                    <li key={tech} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-xs text-muted">
+                      {tech}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+
             <section>
               <h2 className="text-sm font-medium">{c.ui.details}</h2>
               <dl className="mt-3 space-y-1.5 font-mono text-xs">

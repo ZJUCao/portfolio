@@ -4,6 +4,7 @@
 
 import { notFound } from "next/navigation";
 import { hasLocale, type Locale } from "@/i18n";
+import type { SkillGroupId } from "./skills";
 
 export type Experience = {
   period: string;
@@ -30,14 +31,16 @@ const zh = {
     "我上手新技术栈很快：本科读的是英语文学，转行后先后做过华为的分布式中间件、初创公司的 SaaS 后端和苏交科的 BIM 3D 工程软件，每次都能很快接手。我重视代码规范和工程化，在苏交科主导制定了团队的 C# 规范和代码审查流程，组件复用率因此提升了 30%。",
     "现在我在 Northeastern University 读计算机科学硕士，希望继续深耕图形渲染与游戏引擎方向。",
   ],
+  // 手写的技能，按分组写；分组的名字和顺序见 src/data/skills.ts。
+  // 项目里用到的技术（如 GLFW、Next.js）会自动补到对应分组的末尾，这里只写从项目里看不出来的
   skills: {
-    编程语言: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
-    图形与引擎: ["OpenGL", "Shader", "光线追踪", "KD-Tree", "ECS"],
-    计算机视觉: ["OpenCV", "YOLO", "CNN", "DETR", "相机标定"],
-    系统: ["Linux", "分布式系统", "嵌入式系统", "RTOS"],
-    Web: ["React", "Node.js", "PostgreSQL", "MongoDB", "SQLite"],
-    工具: ["Git", "Docker", "Claude Code", "Ollama"],
-  } as Record<string, string[]>,
+    languages: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
+    graphics: ["OpenGL", "Shader", "光线追踪", "KD-Tree", "ECS"],
+    vision: ["OpenCV", "YOLO", "CNN", "DETR", "相机标定"],
+    systems: ["Linux", "分布式系统", "嵌入式系统", "RTOS"],
+    web: ["React", "Node.js", "PostgreSQL", "MongoDB", "SQLite"],
+    tools: ["Git", "Docker", "Claude Code", "Ollama"],
+  } as Partial<Record<SkillGroupId, string[]>>,
   work: [
     {
       period: "2022.04 — 2025.07",
@@ -104,6 +107,7 @@ const zh = {
     forks: "Fork",
     license: "许可证",
     languages: "语言构成",
+    stack: "技术栈",
     topics: "主题",
     details: "仓库信息",
     viewOnGithub: "GitHub 仓库",
@@ -134,12 +138,12 @@ const en: typeof zh = {
     "I'm now pursuing an M.S. in Computer Science at Northeastern University, and plan to keep going deep on rendering and game engines.",
   ],
   skills: {
-    Languages: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
-    "Graphics & Engines": ["OpenGL", "Shaders", "Ray Tracing", "KD-Tree", "ECS"],
-    "Computer Vision": ["OpenCV", "YOLO", "CNN", "DETR", "Camera Calibration"],
-    Systems: ["Linux", "Distributed Systems", "Embedded Systems", "RTOS"],
-    Web: ["React", "Node.js", "PostgreSQL", "MongoDB", "SQLite"],
-    Tools: ["Git", "Docker", "Claude Code", "Ollama"],
+    languages: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
+    graphics: ["OpenGL", "Shaders", "Ray Tracing", "KD-Tree", "ECS"],
+    vision: ["OpenCV", "YOLO", "CNN", "DETR", "Camera Calibration"],
+    systems: ["Linux", "Distributed Systems", "Embedded Systems", "RTOS"],
+    web: ["React", "Node.js", "PostgreSQL", "MongoDB", "SQLite"],
+    tools: ["Git", "Docker", "Claude Code", "Ollama"],
   },
   work: [
     {
@@ -210,6 +214,7 @@ const en: typeof zh = {
     forks: "Forks",
     license: "License",
     languages: "Languages",
+    stack: "Tech stack",
     topics: "Topics",
     details: "Repository",
     viewOnGithub: "GitHub repo",
