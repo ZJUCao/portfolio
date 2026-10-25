@@ -93,3 +93,27 @@ body {
   display: block;
   overflow-x: auto;
 }
+
+/* README 里的 Mermaid 图，由 Readme 组件在浏览器里画成 SVG。节点里的长单词不要从中间断开 */
+.readme .mermaid-diagram {
+  margin-block: 2em;
+  overflow-x: auto;
+  overflow-wrap: normal;
+}
+
+.readme .mermaid-diagram svg {
+  margin-inline: auto;
+}
+
+/* 画图期间容器放在原代码块旁边：不占位置也不显示，但宽度和继承的样式都和最终位置一样 */
+.readme .mermaid-diagram[data-drawing] {
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+/* GitHub 放在 Mermaid 代码块下面的加载动画，在这里不会转，也用不上 */
+.readme .js-render-enrichment-loader {
+  display: none;
+}

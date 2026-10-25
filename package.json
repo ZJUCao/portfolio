@@ -12,6 +12,7 @@
     "prebuild": "node scripts/fetch-github.mjs"
   },
   "dependencies": {
+    "mermaid": "^12.2.0",
     "motion": "^14.6.0",
     "next": "16.4.2",
     "react": "19.3.0",

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { languageColor, LanguageDot } from "@/components/LanguageDot";
+import { Readme } from "@/components/Readme";
 import { Reveal } from "@/components/Reveal";
 import { contentFor } from "@/data/profile";
 import { formatMonth, getProject, projectSlugs } from "@/data/projects";
@@ -109,11 +110,10 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
                 {project.readme.lang && project.readme.lang !== c.locale && (
                   <p className="mt-3 text-sm text-muted">{c.ui.readmeOtherLanguage}</p>
                 )}
-                {/* README 是 GitHub 渲染并清理过的 HTML，只来自本人的公开仓库 */}
-                <div
+                <Readme
+                  html={project.readme.html}
                   lang={project.readme.lang ? htmlLang(project.readme.lang) : undefined}
                   className="readme prose prose-sm mt-6 max-w-none sm:prose-base"
-                  dangerouslySetInnerHTML={{ __html: project.readme.html }}
                 />
               </>
             ) : (
