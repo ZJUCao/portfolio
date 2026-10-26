@@ -57,17 +57,20 @@ function FilterView({
                   type="button"
                   aria-pressed={selected}
                   onClick={() => onSelect?.(chip.id)}
-                  className={`relative flex items-center gap-1.5 rounded-full border border-line px-3.5 py-1.5 text-sm transition-colors ${
-                    selected ? "text-foreground" : "text-muted hover:border-foreground hover:text-foreground"
+                  style={chip.id ? ({ "--tint": `var(--cat-${chip.id})` } as React.CSSProperties) : undefined}
+                  className={`relative flex items-center gap-1.5 rounded-full border bg-white/[0.03] px-3.5 py-1.5 text-sm backdrop-blur transition-colors ${
+                    selected ? "border-white/20 text-foreground" : "border-line text-muted hover:border-white/25 hover:text-foreground"
                   }`}
                 >
                   {selected && (
                     <motion.span
                       layoutId="category-pill"
-                      className="absolute inset-0 -z-10 rounded-full bg-line"
+                      className="absolute inset-0 -z-10 rounded-full bg-white/10"
                       transition={{ type: "spring", stiffness: 400, damping: 32 }}
                     />
                   )}
+                  {/* 分类的标记色，和卡片封面上的一样 */}
+                  {chip.id && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--tint)]" />}
                   {chip.label}
                   <span className="font-mono text-xs text-muted">{chip.count}</span>
                 </button>
@@ -77,7 +80,7 @@ function FilterView({
         </Reveal>
       )}
       {/* 切换分类时，留下的卡片滑到新位置，移走的淡出，新出现的由 Reveal 淡入 */}
-      <div className={`relative grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 ${showFilter ? "mt-6" : "mt-12"}`}>
+      <div className={`relative grid auto-rows-fr grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${showFilter ? "mt-6" : "mt-12"}`}>
         <AnimatePresence mode="popLayout">
           {visible.map((item, i) => (
             <motion.div

@@ -34,9 +34,14 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
   };
 
   return (
-    <header className="sticky top-0 z-10 border-b border-line bg-background/80 backdrop-blur">
-      <nav className="mx-auto flex h-14 max-w-4xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href={`/${locale}`} className="shrink-0 font-semibold tracking-tight">
+    // 浮在页面上方的玻璃胶囊，名字前的圆点是一直亮着的「追踪中」指示灯
+    <header className="sticky top-0 z-20 px-3 pt-3 sm:px-6 sm:pt-4">
+      <nav className="glass mx-auto flex h-12 max-w-6xl items-center justify-between gap-4 rounded-full bg-background/70 pl-4 pr-1.5 backdrop-blur-xl sm:pl-5">
+        <Link href={`/${locale}`} className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight">
+          <span aria-hidden className="relative flex h-2 w-2">
+            <span className="absolute inset-0 rounded-full bg-accent opacity-60 motion-safe:animate-ping" />
+            <span className="relative h-2 w-2 rounded-full bg-accent" />
+          </span>
           {name}
         </Link>
         <div className="flex items-center gap-1 text-sm">
@@ -54,7 +59,7 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
                     {active && (
                       <motion.span
                         layoutId="nav-pill"
-                        className="absolute inset-0 -z-10 rounded-full bg-line"
+                        className="absolute inset-0 -z-10 rounded-full bg-white/10"
                         transition={{ type: "spring", stiffness: 400, damping: 32 }}
                       />
                     )}
@@ -69,7 +74,7 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
             onClick={rememberChoice}
             hrefLang={other}
             aria-label={switchAria}
-            className="ml-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1 font-mono text-xs sm:ml-2 sm:px-3 text-muted transition-colors hover:border-foreground hover:text-foreground"
+            className="ml-1 whitespace-nowrap rounded-full border border-line px-2.5 py-1 font-mono text-xs sm:ml-2 sm:px-3 text-muted transition-colors hover:border-accent hover:text-accent"
           >
             {switchLabel}
           </Link>

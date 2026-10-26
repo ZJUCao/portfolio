@@ -27,7 +27,8 @@ export const languageColor = (name: string) => COLORS[name] ?? "#8b8b8b";
 export function LanguageDot({ name }: { name: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
-      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: languageColor(name) }} />
+      {/* 深色背景上，Lua、C 这类深色的点要靠一圈描边才看得见 */}
+      <span className="h-2.5 w-2.5 rounded-full ring-1 ring-white/25" style={{ backgroundColor: languageColor(name) }} />
       {name}
     </span>
   );

@@ -20,11 +20,13 @@ const shared = {
     { label: "LinkedIn", href: "https://www.linkedin.com/in/yu-cao-19026238a/" },
   ],
   location: "Boston, MA",
+  coordinates: "42.36°N 71.06°W", // 首页地点旁边的经纬度，取的是波士顿市中心
 };
 
 const zh = {
   name: "曹宇",
   title: "软件工程师",
+  focus: "实时图形 · 计算机视觉 · XR", // 首页大标题上方的一行
   tagline: "五年软件开发经验，主攻 C++、游戏引擎架构与计算机图形学，熟悉 ECS 架构和碰撞检测。",
   about: [
     "我是曹宇，有五年软件开发经验，主攻 C++、游戏引擎架构与计算机图形学，熟悉 ECS 架构和碰撞检测。我习惯把复杂需求拆成可以独立验证的模块，一个人走完方案设计、编码、调试到性能优化的全过程：在 Arcane Survival 中，我用 Flow Field 让 200+ 个敌人稳定运行在 240 FPS。",
@@ -94,6 +96,15 @@ const zh = {
     hello: (name: string) => `你好，我是${name}。`,
     ctaProjects: "看看我的项目",
     ctaContact: "联系我",
+    // 首页 3D 画面四周的 HUD 文字
+    hud: {
+      scene: "实时 3D 场景：棋盘格标定板上的一座场景图城堡，仿照我的 SceneGraph-AR 项目",
+      tracking: "追踪中",
+      board: "标定板 9×6 · 54 个角点",
+      hint: "移动鼠标，换个角度看",
+      ar: "在 AR 中查看",
+      vr: "在 VR 中查看",
+    },
     featured: "精选项目",
     viewAll: "全部 →",
     projectsTitle: "项目",
@@ -132,6 +143,7 @@ const zh = {
 const en: typeof zh = {
   name: "Yu Cao",
   title: "Software Engineer",
+  focus: "Real-time graphics · Computer vision · XR",
   tagline: "Five years of software engineering, focused on C++, game engine architecture, and computer graphics — with hands-on ECS and collision detection.",
   about: [
     "I'm Yu Cao, a software engineer with five years of experience, focused on C++, game engine architecture, and computer graphics, with hands-on work in ECS and collision detection. I break complex requirements into modules I can verify independently, and own the whole path from design and implementation to debugging and performance tuning — in Arcane Survival, a flow field keeps 200+ enemies running at a steady 240 FPS.",
@@ -202,6 +214,14 @@ const en: typeof zh = {
     hello: (name: string) => `Hi, I'm ${name}.`,
     ctaProjects: "See my work",
     ctaContact: "Get in touch",
+    hud: {
+      scene: "Live 3D scene: a scene-graph castle on a calibration checkerboard, modeled on my SceneGraph-AR project",
+      tracking: "Tracking",
+      board: "Board 9×6 · 54 corners",
+      hint: "Move the pointer to look around",
+      ar: "View in AR",
+      vr: "View in VR",
+    },
     featured: "Featured projects",
     viewAll: "All →",
     projectsTitle: "Projects",

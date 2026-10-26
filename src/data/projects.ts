@@ -120,6 +120,9 @@ type Override = {
   hidden?: boolean;
   // 演示视频：中文页优先用 B 站，英文页优先用 YouTube，只有一个就两边都用它
   video?: { youtube?: string; bilibili?: string };
+  // 卡片封面图的地址。不写时用 README 里的图：文件名带 cover、banner 或 hero 的优先，否则第一张；
+  // README 里没有图时，卡片上按分类画一幅线稿
+  cover?: string;
 };
 
 const overrides: Record<string, Override> = {
@@ -169,6 +172,7 @@ export type Project = {
   createdAt: string;
   pushedAt: string;
   readme: { html: string; lang: Locale | null } | null;
+  cover: string | null; // 卡片封面图，见 Override.cover
   featured: boolean;
   video: { kind: "youtube" | "bilibili"; embedUrl: string } | null;
 };
@@ -224,6 +228,14 @@ function categoryOf(repo: GithubRepo, o: Override, stackGroups: Set<SkillGroupId
   );
 }
 
+// README 里可以当封面的图：跳过 shields.io 一类的徽章，文件名带 cover、banner 或 hero 的排前面
+function coverOf(html: string) {
+  const images = [...html.matchAll(/<img\b[^>]*?\bsrc="([^"]+)"/gi)]
+    .map((m) => m[1].replaceAll("&amp;", "&"))
+    .filter((src) => !/shields\.io|badgen\.net|badge\.fury\.io|\/badge\.svg/i.test(src));
+  return images.find((src) => /(cover|banner|hero)[^/]*$/i.test(src)) ?? images[0] ?? null;
+}
+
 // 同一内容有几种语言的版本时，优先取页面语言的，没有就取排在第一个的
 const preferLocale = <T extends { lang: Locale | null }>(locale: Locale, items: T[]) =>
   items.find((item) => item.lang === locale) ?? items[0] ?? null;
@@ -273,6 +285,7 @@ export function getProjects(locale: Locale): Project[] {
         createdAt: repo.createdAt,
         pushedAt: repo.pushedAt,
         readme: readme && { html: linkReadmes(readme.html, repo), lang: readme.lang },
+        cover: o.cover ?? (readme && coverOf(readme.html)),
         featured: Boolean(o.featured),
         video: embedFor(locale, o.video),
       };

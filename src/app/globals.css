@@ -1,24 +1,22 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* 网站只有深色一套配色，像戴上头显后的空间：深色背景、半透明的玻璃面板、青色的追踪标记 */
 :root {
-  --background: #faf9f6;
-  --foreground: #1a1a1a;
-  --muted: #6b6b6b;
-  --line: #e4e2dc;
-  --surface: #ffffff;
-  --accent: #c2410c;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #111110;
-    --foreground: #ededec;
-    --muted: #9a9a96;
-    --line: #2a2a28;
-    --surface: #181817;
-    --accent: #fb923c;
-  }
+  color-scheme: dark;
+  --background: #05070d;
+  --foreground: #e6ecf5;
+  --muted: #8d99ab;
+  --line: rgb(148 170 210 / 0.14);
+  --surface: rgb(255 255 255 / 0.035);
+  --accent: #5fe3ff;
+  /* 各项目分类的标记色，卡片和筛选栏上用，对应 projects.ts 里分类的 id */
+  --cat-xr: #5fe3ff;
+  --cat-engines: #fbbf6a;
+  --cat-perception: #6ee7a8;
+  --cat-rendering: #b69cff;
+  --cat-tools: #93a4bd;
+  --cat-other: #93a4bd;
 }
 
 @theme inline {
@@ -37,9 +35,102 @@ body {
   color: var(--foreground);
 }
 
+/* 背景：顶上两团环境光，加一层往下渐渐消失的网格，像 VR 里空旷的场景 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(56rem 36rem at 12% -12%, rgb(56 189 248 / 0.13), transparent 65%),
+    radial-gradient(48rem 32rem at 92% -8%, rgb(139 92 246 / 0.13), transparent 65%),
+    linear-gradient(rgb(148 170 210 / 0.05) 1px, transparent 1px) 0 0 / 56px 56px,
+    linear-gradient(90deg, rgb(148 170 210 / 0.05) 1px, transparent 1px) 0 0 / 56px 56px;
+  mask-image: linear-gradient(to bottom, black 20%, transparent 85%);
+}
+
 ::selection {
   background: var(--accent);
   color: var(--background);
+}
+
+/* 玻璃面板：半透明，上沿一道高光，像 visionOS 里浮在空中的窗口。
+   只用 background-image，可以再叠 bg-* 的底色；需要模糊背后内容的地方（导航栏）另加 backdrop-blur，
+   大面板不加，免得滚动时整块重新模糊 */
+@utility glass {
+  background-image: linear-gradient(180deg, rgb(255 255 255 / 0.065), rgb(255 255 255 / 0.02));
+  border: 1px solid rgb(255 255 255 / 0.09);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 24px 48px -24px rgb(0 0 0 / 0.7);
+}
+
+/* 取景框四角的标记，放在一个 absolute 的空元素上；颜色默认是 accent，可用 --hud-color 换 */
+@utility hud-corners {
+  --c: var(--hud-color, var(--accent));
+  --s: 14px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--s) 1px,
+    linear-gradient(var(--c), var(--c)) top left / 1px var(--s),
+    linear-gradient(var(--c), var(--c)) top right / var(--s) 1px,
+    linear-gradient(var(--c), var(--c)) top right / 1px var(--s),
+    linear-gradient(var(--c), var(--c)) bottom left / var(--s) 1px,
+    linear-gradient(var(--c), var(--c)) bottom left / 1px var(--s),
+    linear-gradient(var(--c), var(--c)) bottom right / var(--s) 1px,
+    linear-gradient(var(--c), var(--c)) bottom right / 1px var(--s);
+  background-repeat: no-repeat;
+}
+
+/* 首页 3D 画面加载前（或不支持 WebGL 时）的底图：一块往远处延伸的透视网格地面 */
+@utility grid-floor {
+  background:
+    linear-gradient(rgb(95 227 255 / 0.2) 1px, transparent 1px) 0 0 / 44px 44px,
+    linear-gradient(90deg, rgb(95 227 255 / 0.2) 1px, transparent 1px) 0 0 / 44px 44px;
+  mask-image: linear-gradient(to top, black, transparent 90%);
+  transform: perspective(420px) rotateX(64deg);
+  transform-origin: bottom;
+}
+
+/* 首页大标题的全息渐变 */
+@utility text-holo {
+  background: linear-gradient(100deg, #ffffff 15%, #c4f1ff 50%, #9cc2ff 75%, #cdb8ff 100%);
+  background-clip: text;
+  color: transparent;
+}
+
+/* 标签：技术栈、技能、主题 */
+@utility chip {
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: rgb(255 255 255 / 0.03);
+  padding: 0.125rem 0.625rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: var(--muted);
+}
+
+/* 项目卡片跟着鼠标微微倾斜，鼠标所在处亮起一圈光，像头显里被注视的面板。
+   --rx、--ry、--mx、--my 由 Tilt 组件设置，--tint 是卡片所属分类的颜色 */
+.tilt {
+  transform: perspective(900px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg));
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tilt {
+    transform: none;
+  }
+}
+
+@utility spotlight {
+  background: radial-gradient(
+    26rem circle at var(--mx, 50%) var(--my, 0%),
+    color-mix(in srgb, var(--tint, var(--accent)) 16%, transparent),
+    transparent 45%
+  );
 }
 
 /* 项目详情页里 GitHub 渲染的 README：排版颜色跟随站点主题 */

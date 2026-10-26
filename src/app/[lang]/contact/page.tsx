@@ -33,7 +33,7 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
             href={link.href}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full border border-line px-5 py-2.5 text-sm transition-colors hover:border-foreground"
+            className="glass rounded-full px-5 py-2.5 text-sm transition-colors hover:border-accent/60"
           >
             {link.label} ↗
           </a>

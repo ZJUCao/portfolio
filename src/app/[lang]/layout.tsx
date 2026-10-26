@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Nav } from "@/components/Nav";
 import { contentFor } from "@/data/profile";
@@ -18,6 +18,9 @@ const geistMono = Geist_Mono({
 // 静态导出：只生成 /zh 和 /en 两套页面，其他语言前缀一律 404
 export const dynamicParams = false;
 export const generateStaticParams = () => locales.map((lang) => ({ lang }));
+
+// 手机浏览器的地址栏也用网站的深色
+export const viewport: Viewport = { themeColor: "#05070d" };
 
 export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Promise<Metadata> {
   const { lang } = await params;
@@ -48,9 +51,9 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
           switchLabel={c.ui.switchLabel}
           switchAria={c.ui.switchAria}
         />
-        <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-16 sm:px-6 sm:py-24">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-12 sm:px-6 sm:py-20">{children}</main>
         <footer className="border-t border-line">
-          <div className="mx-auto flex max-w-4xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted sm:px-6">
+          <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-2 px-4 py-6 text-sm text-muted sm:px-6">
             <span>© {c.name}</span>
             <span className="flex gap-4">
               {c.links.map((link) => (

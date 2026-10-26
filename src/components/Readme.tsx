@@ -3,7 +3,7 @@
 import type { Mermaid, MermaidConfig } from "mermaid";
 import { useEffect, useRef } from "react";
 
-// 每次画图都换一个新 id：重画时新旧两张图同时在页面上，mermaid 靠 id 找临时元素、限定 SVG 里样式的范围
+// 每张图都用一个新 id：mermaid 靠 id 找临时元素、限定 SVG 里样式的范围，同一页的几张图、换页后再画的图都不能重复
 let diagramCount = 0;
 
 // 项目详情页的 README 正文。Mermaid 代码块 GitHub 只给原始代码（github.com 在浏览器里才画图），
@@ -21,34 +21,27 @@ export function Readme({ html, lang, className }: { html: string; lang?: string;
     }));
     if (blocks.length === 0) return;
 
-    const dark = matchMedia("(prefers-color-scheme: dark)");
     let cancelled = false;
     const draw = async () => {
       const { default: mermaid } = await import("mermaid");
       // 等网页字体加载完再量文字，不然字体换掉后标签会撑出节点
       await document.fonts.ready;
       if (cancelled) return;
-      mermaid.initialize(mermaidConfig(root, dark.matches));
+      mermaid.initialize(mermaidConfig(root));
       for (const block of blocks) {
         if (cancelled) return;
         try {
-          block.el = await replaceWithDiagram(mermaid, block.source, block.el);
+          await replaceWithDiagram(mermaid, block.source, block.el);
         } catch (error) {
           console.warn("Could not render a Mermaid diagram, keeping it as is:", error);
         }
       }
     };
 
-    // 系统切换深浅色时按新颜色重画，排在上一轮后面；mermaid 加载失败（比如断网）时原始代码留着
-    const report = (error: unknown) => console.warn("Could not load Mermaid:", error);
-    let drawing = draw().catch(report);
-    const redraw = () => {
-      drawing = drawing.then(draw).catch(report);
-    };
-    dark.addEventListener("change", redraw);
+    // mermaid 加载失败（比如断网）时原始代码留着
+    draw().catch((error) => console.warn("Could not load Mermaid:", error));
     return () => {
       cancelled = true;
-      dark.removeEventListener("change", redraw);
     };
   }, [html]);
 
@@ -73,15 +66,14 @@ async function replaceWithDiagram(mermaid: Mermaid, source: string, el: Element)
     if (svgEl && width) svgEl.style.minWidth = `${Math.round(width * 0.7)}px`;
     delete container.dataset.drawing;
     el.replaceWith(container);
-    return container;
   } catch (error) {
     container.remove();
     throw error;
   }
 }
 
-// mermaid 把颜色直接写进 SVG，所以按当前主题读出站点的 CSS 变量交给它
-function mermaidConfig(root: HTMLElement, dark: boolean): MermaidConfig {
+// mermaid 把颜色直接写进 SVG，所以读出站点的 CSS 变量交给它。网站只有深色主题
+function mermaidConfig(root: HTMLElement): MermaidConfig {
   const style = getComputedStyle(root);
   const color = (name: string) => style.getPropertyValue(name).trim();
   return {
@@ -97,7 +89,7 @@ function mermaidConfig(root: HTMLElement, dark: boolean): MermaidConfig {
     theme: "base",
     fontFamily: style.fontFamily,
     themeVariables: {
-      darkMode: dark,
+      darkMode: true,
       background: color("--surface"),
       primaryColor: color("--background"),
       primaryBorderColor: color("--line"),

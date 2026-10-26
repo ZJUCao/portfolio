@@ -36,7 +36,8 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
   ];
 
   return (
-    <article>
+    // --tint：项目所属分类的颜色，和卡片上的一样
+    <article style={{ "--tint": `var(--cat-${project.category.id})` } as React.CSSProperties}>
       <Reveal>
         <Link href={`/${lang}/projects`} className="text-sm text-muted hover:text-foreground">
           {c.ui.backToProjects}
@@ -47,8 +48,9 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
         <Reveal delay={0.04}>
           <Link
             href={`/${lang}/projects?category=${project.category.id}`}
-            className="font-mono text-sm text-accent hover:underline"
+            className="inline-flex items-center gap-2 font-mono text-sm text-[var(--tint)] hover:underline"
           >
+            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--tint)]" />
             {project.category.label}
           </Link>
           <h1 className="mt-3 break-words text-4xl font-semibold tracking-tight sm:text-5xl">{project.title}</h1>
@@ -68,7 +70,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
             href={project.url}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-85"
+            className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background shadow-[0_0_32px_-8px_rgb(95_227_255/0.7)] transition-shadow hover:shadow-[0_0_40px_-4px_rgb(95_227_255/0.8)]"
           >
             {c.ui.viewOnGithub} ↗
           </a>
@@ -77,7 +79,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
               href={project.homepage}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full border border-line px-5 py-2.5 text-sm font-medium transition-colors hover:border-foreground"
+              className="glass rounded-full px-5 py-2.5 text-sm font-medium transition-colors hover:border-accent/60"
             >
               {c.ui.liveDemo} ↗
             </a>
@@ -88,7 +90,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
       {project.video && (
         <Reveal className="mt-14">
           <h2 className="text-sm font-medium text-muted">{c.ui.demoVideo}</h2>
-          <div className="mt-4 aspect-video overflow-hidden rounded-2xl border border-line bg-surface">
+          <div className="glass mt-4 aspect-video overflow-hidden rounded-3xl">
             <iframe
               src={project.video.embedUrl}
               title={`${project.title} — ${c.ui.demoVideo}`}
@@ -101,9 +103,10 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
         </Reveal>
       )}
 
-      <div className="mt-14 grid gap-12 lg:grid-cols-[minmax(0,1fr)_220px]">
+      <div className="mt-14 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
         <Reveal className="min-w-0">
-          <section className="rounded-2xl border border-line bg-surface p-6 sm:p-8">
+          <section className="glass relative rounded-3xl p-6 sm:p-8">
+            <span aria-hidden className="hud-corners absolute inset-3 opacity-50 [--hud-color:var(--tint)]" />
             <h2 className="font-mono text-xs uppercase tracking-wider text-muted">{c.ui.readme}</h2>
             {project.readme ? (
               <>
@@ -122,7 +125,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
           </section>
         </Reveal>
         <Reveal className="min-w-0">
-          <aside className="space-y-8 lg:sticky lg:top-24">
+          <aside className="glass space-y-8 rounded-3xl p-6 lg:sticky lg:top-24">
             {project.languages.length > 0 && (
               <section>
                 <h2 className="text-sm font-medium">{c.ui.languages}</h2>
@@ -147,7 +150,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
                 <h2 className="text-sm font-medium">{c.ui.stack}</h2>
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {project.stack.map((tech) => (
-                    <li key={tech} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-xs text-muted">
+                    <li key={tech} className="chip">
                       {tech}
                     </li>
                   ))}
@@ -172,7 +175,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
                 <h2 className="text-sm font-medium">{c.ui.topics}</h2>
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {project.topics.map((topic) => (
-                    <li key={topic} className="rounded-full border border-line px-2.5 py-0.5 font-mono text-xs text-muted">
+                    <li key={topic} className="chip">
                       {topic}
                     </li>
                   ))}
@@ -187,7 +190,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
       {(prev || next) && (
         <nav className="mt-16 grid gap-4 border-t border-line pt-8 sm:grid-cols-2">
           {prev ? (
-            <Link href={`/${lang}/projects/${prev.slug}`} className="group rounded-2xl p-4 transition-colors hover:bg-surface">
+            <Link href={`/${lang}/projects/${prev.slug}`} className="group rounded-2xl p-4 transition-colors hover:bg-white/5">
               <span className="text-xs text-muted">← {c.ui.prevProject}</span>
               <span className="mt-1 block font-semibold group-hover:text-accent">{prev.title}</span>
             </Link>
@@ -195,7 +198,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
             <span />
           )}
           {next && (
-            <Link href={`/${lang}/projects/${next.slug}`} className="group rounded-2xl p-4 text-right transition-colors hover:bg-surface">
+            <Link href={`/${lang}/projects/${next.slug}`} className="group rounded-2xl p-4 text-right transition-colors hover:bg-white/5">
               <span className="text-xs text-muted">{c.ui.nextProject} →</span>
               <span className="mt-1 block font-semibold group-hover:text-accent">{next.title}</span>
             </Link>
