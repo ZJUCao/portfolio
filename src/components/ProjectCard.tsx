@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CoverArt } from "@/components/CoverArt";
+import { CoverImage } from "@/components/CoverImage";
 import { LanguageDot } from "@/components/LanguageDot";
 import { Tilt } from "@/components/Tilt";
 import type { Content } from "@/data/profile";
@@ -22,20 +23,7 @@ export function ProjectCard({ project, c }: { project: Project; c: Content }) {
       >
         <span aria-hidden className="spotlight pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
         <div className="relative aspect-[16/10] overflow-hidden border-b border-line bg-black/40">
-          {project.cover ? (
-            // README 里的图不少是左右对比的拼图，靠右对齐，露出的是效果图那一半。
-            // 静态导出没有图片优化服务，直接用原图地址
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={project.cover}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover object-right transition-transform duration-700 group-hover:scale-[1.04]"
-            />
-          ) : (
-            <CoverArt category={project.category.id} />
-          )}
+          {project.cover ? <CoverImage src={project.cover} /> : <CoverArt category={project.category.id} />}
           <span aria-hidden className="hud-corners absolute inset-3 opacity-70 [--hud-color:var(--tint)]" />
           <span className="absolute left-4 top-3.5 flex max-w-[calc(100%-2rem)] items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 font-mono text-[11px] text-foreground backdrop-blur">
             <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--tint)]" />

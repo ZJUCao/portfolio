@@ -121,7 +121,7 @@ type Override = {
   // 演示视频：中文页优先用 B 站，英文页优先用 YouTube，只有一个就两边都用它
   video?: { youtube?: string; bilibili?: string };
   // 卡片封面图的地址。不写时用 README 里的图：文件名带 cover、banner 或 hero 的优先，否则第一张；
-  // README 里没有图时，卡片上按分类画一幅线稿
+  // README 里没有图时，卡片上按分类画一幅线稿。左右并排的对比图在卡片上只显示右边那张，见 CoverImage
   cover?: string;
 };
 
