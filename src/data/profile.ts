@@ -35,11 +35,12 @@ const zh = {
   // 项目里用到的技术（如 GLFW、Next.js）会自动补到对应分组的末尾，这里只写从项目里看不出来的
   skills: {
     languages: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
-    graphics: ["OpenGL", "Shader", "光线追踪", "KD-Tree", "ECS"],
-    vision: ["OpenCV", "YOLO", "CNN", "DETR", "相机标定"],
-    systems: ["Linux", "分布式系统", "嵌入式系统", "RTOS"],
+    xr: ["增强现实"],
+    engines: ["ECS", "碰撞检测"],
+    perception: ["OpenCV", "YOLO", "CNN", "DETR", "相机标定"],
+    rendering: ["OpenGL", "Shader", "光线追踪", "KD-Tree"],
     web: ["React", "Node.js", "PostgreSQL", "MongoDB", "SQLite"],
-    tools: ["Git", "Docker", "Claude Code", "Ollama"],
+    systems: ["Linux", "分布式系统", "嵌入式系统", "RTOS", "Git", "Docker", "Claude Code", "Ollama"],
   } as Partial<Record<SkillGroupId, string[]>>,
   work: [
     {
@@ -139,11 +140,12 @@ const en: typeof zh = {
   ],
   skills: {
     languages: ["C/C++", "C#", "Java", "Python", "JavaScript", "Lua", "GLSL"],
-    graphics: ["OpenGL", "Shaders", "Ray Tracing", "KD-Tree", "ECS"],
-    vision: ["OpenCV", "YOLO", "CNN", "DETR", "Camera Calibration"],
-    systems: ["Linux", "Distributed Systems", "Embedded Systems", "RTOS"],
+    xr: ["Augmented Reality"],
+    engines: ["ECS", "Collision Detection"],
+    perception: ["OpenCV", "YOLO", "CNN", "DETR", "Camera Calibration"],
+    rendering: ["OpenGL", "Shaders", "Ray Tracing", "KD-Tree"],
     web: ["React", "Node.js", "PostgreSQL", "MongoDB", "SQLite"],
-    tools: ["Git", "Docker", "Claude Code", "Ollama"],
+    systems: ["Linux", "Distributed Systems", "Embedded Systems", "RTOS", "Git", "Docker", "Claude Code", "Ollama"],
   },
   work: [
     {

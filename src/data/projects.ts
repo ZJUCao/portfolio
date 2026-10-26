@@ -5,7 +5,7 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@/i18n";
 import snapshot from "./github.generated.json";
-import { stackOf } from "./skills";
+import { stackGroupsOf, stackOf, type SkillGroupId } from "./skills";
 
 // scripts/fetch-github.mjs 写出的数据格式。显式声明，避免类型随抓到的数据变化
 type GithubReadme = {
@@ -34,54 +34,77 @@ type GithubRepo = {
 };
 const github = snapshot as unknown as { user: string; fetchedAt: string; repos: GithubRepo[] };
 
-// 项目分类，按这里的顺序显示在项目页的筛选栏里，没有项目的分类不显示。
-// 仓库归哪一类：overrides 里写了 category 就用它；否则看仓库在 GitHub 上的 topics，
-// 归到第一个 topics 对得上的分类；都对不上归到「其他」。
-// 所以新仓库在 GitHub 上加个 topic（如 opengl、computer-vision）就能自动归类，不用改这里。
+// 项目分类，按 XR 的技术栈来分，按这里的顺序显示在项目页的筛选栏里，没有项目的分类不显示。
+// 仓库归哪一类，依次看：
+//   1. overrides 里写的 category；
+//   2. 仓库在 GitHub 上的 topics：归到第一个 topics 对得上的分类；
+//   3. 项目本身：归到第一个对得上的分类——识别出的技术栈里有 groups 所列分组的技术（见 skills.ts），
+//      或者仓库名、GitHub 简介、README 第一段里出现 keywords 里的词；
+//   4. 都对不上归到「其他」。
+// 排在前面的分类优先：XR 项目常常也用 OpenGL 和 OpenCV，自研引擎和视觉项目也常用 OpenGL 画画面，
+// 所以 XR 排最前，渲染靠后。新仓库一般不用改这里就能自动归类；归错了就在 GitHub 上给它加个 topic
+// （如 augmented-reality、game-engine），或者在 overrides 里写 category。
+type Category = Record<Locale, string> & { topics: string[]; groups?: SkillGroupId[]; keywords?: string[] };
+
 const categories = {
-  graphics: {
-    zh: "图形与引擎",
-    en: "Graphics & Engines",
+  xr: {
+    zh: "XR 与空间计算",
+    en: "XR & Spatial Computing",
     topics: [
-      "computer-graphics", "graphics", "rendering", "renderer", "ray-tracing", "raytracing", "path-tracing", "rasterizer",
-      "opengl", "webgl", "vulkan", "directx", "glsl", "hlsl", "shader", "shaders", "game-engine", "game-development",
-      "gamedev", "game", "ecs", "physics-engine", "collision-detection", "unity", "unreal-engine",
+      "xr", "ar", "vr", "augmented-reality", "virtual-reality", "mixed-reality", "extended-reality", "spatial-computing",
+      "openxr", "webxr", "arkit", "arcore", "arfoundation", "realitykit", "visionos", "vision-pro", "oculus", "meta-quest",
+      "oculus-quest", "hololens", "mrtk", "vuforia", "steamvr",
+    ],
+    groups: ["xr"],
+    // 用 OpenCV + OpenGL 自己实现的 AR 从技术栈看不出来，所以还看这些词
+    keywords: [
+      "ar", "vr", "xr", "webxr", "openxr", "augmented reality", "virtual reality", "mixed reality", "extended reality",
+      "spatial computing", "vision pro", "meta quest", "oculus", "hololens", "增强现实", "虚拟现实", "混合现实", "扩展现实",
+      "空间计算",
     ],
   },
-  vision: {
-    zh: "计算机视觉",
-    en: "Computer Vision",
+  engines: {
+    zh: "引擎与交互",
+    en: "Engines & Interaction",
+    topics: [
+      "game-engine", "game-development", "gamedev", "game", "games", "ecs", "entity-component-system", "physics-engine",
+      "physics", "collision-detection", "unity", "unity3d", "unreal-engine", "unreal", "godot",
+    ],
+    groups: ["engines"],
+  },
+  perception: {
+    zh: "视觉与感知",
+    en: "Vision & Perception",
     topics: [
       "computer-vision", "opencv", "image-processing", "object-detection", "image-classification", "image-segmentation",
-      "yolo", "detr", "camera-calibration", "pattern-recognition",
+      "pose-estimation", "slam", "visual-slam", "hand-tracking", "point-cloud", "camera-calibration", "yolo", "detr",
+      "mediapipe", "pattern-recognition",
     ],
+    groups: ["perception"],
   },
-  ai: {
-    zh: "AI 应用",
-    en: "Applied AI",
+  rendering: {
+    zh: "图形渲染",
+    en: "Rendering",
+    topics: [
+      "computer-graphics", "graphics", "rendering", "renderer", "real-time-rendering", "ray-tracing", "raytracing",
+      "path-tracing", "rasterizer", "pbr", "opengl", "webgl", "webgpu", "vulkan", "metal", "directx", "glsl", "hlsl",
+      "shader", "shaders", "threejs",
+    ],
+    groups: ["rendering"],
+  },
+  tools: {
+    zh: "AI 与工具",
+    en: "AI & Tools",
     topics: [
       "ai", "artificial-intelligence", "llm", "llms", "agent", "agents", "ai-agent", "ai-agents", "machine-learning",
-      "deep-learning", "nlp", "rag", "ollama", "chatbot",
+      "deep-learning", "nlp", "rag", "ollama", "chatbot", "web", "website", "web-app", "webapp", "frontend", "backend",
+      "fullstack", "full-stack", "nextjs", "react", "vue", "nodejs", "saas", "portfolio", "cli", "developer-tools",
+      "automation",
     ],
-  },
-  systems: {
-    zh: "系统",
-    en: "Systems",
-    topics: [
-      "systems", "distributed-systems", "operating-system", "kernel", "embedded", "embedded-systems", "rtos", "freertos",
-      "linux", "networking", "compiler", "database", "middleware", "concurrency",
-    ],
-  },
-  web: {
-    zh: "Web",
-    en: "Web",
-    topics: [
-      "web", "website", "web-app", "webapp", "frontend", "backend", "fullstack", "full-stack", "nextjs", "react", "vue",
-      "nodejs", "express", "saas", "portfolio",
-    ],
+    groups: ["ai", "web"],
   },
   other: { zh: "其他", en: "Other", topics: [] },
-} satisfies Record<string, Record<Locale, string> & { topics: string[] }>;
+} satisfies Record<string, Category>;
 
 export type CategoryId = keyof typeof categories;
 const categoryIds = Object.keys(categories) as CategoryId[];
@@ -102,7 +125,6 @@ type Override = {
 const overrides: Record<string, Override> = {
   "job-assistant": {
     featured: true,
-    category: "ai",
     zh: {
       title: "求职助手",
       summary: "一组完全在本机运行的求职 Agent：按岗位 JD 优化简历，并从多个来源找岗位、和个人经历做匹配。个人数据不出本机，测试禁止访问外网。",
@@ -114,7 +136,6 @@ const overrides: Record<string, Override> = {
     },
   },
   portfolio: {
-    category: "web",
     featured: false, // 访客正在看的就是它，不必再放进精选
     zh: {
       title: "个人作品集",
@@ -125,8 +146,6 @@ const overrides: Record<string, Override> = {
       summary: "This site. A bilingual Next.js static export whose projects sync automatically from GitHub, deployed on Vercel.",
     },
   },
-  "SceneGraph-Ray-Tracer": { category: "graphics" },
-  "SceneGraph-Renderer": { category: "graphics" },
 };
 
 // 首页「精选项目」至少放几个：overrides 里标了 featured: true 的都放，不够这个数时
@@ -178,8 +197,32 @@ function toPercentages(bytes: Record<string, number>) {
     .sort((a, b) => b.percent - a.percent);
 }
 
-const categoryOf = (repo: GithubRepo, o: Override): CategoryId =>
-  o.category ?? categoryIds.find((id) => categories[id].topics.some((t) => repo.topics.includes(t))) ?? "other";
+// 找关键词用的文字：小写，单词之间隔一个空格，驼峰写法也拆开（SceneGraph-AR → scene graph ar，ARKit → ar kit）
+const wordsOf = (text: string) =>
+  ` ${text
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()} `;
+
+// 英文要整词对上（ar 不算 car 里的 ar），中文直接找
+const mentions = (words: string, keyword: string) =>
+  words.includes(/\p{Script=Han}/u.test(keyword) ? keyword : wordsOf(keyword));
+
+// 规则见上面的 categories。stackGroups 是项目用到的技术所属的分组
+function categoryOf(repo: GithubRepo, o: Override, stackGroups: Set<SkillGroupId>): CategoryId {
+  if (o.category) return o.category;
+  const byTopic = categoryIds.find((id) => categories[id].topics.some((t) => repo.topics.includes(t)));
+  if (byTopic) return byTopic;
+  const words = wordsOf([repo.name, repo.description, ...repo.readmes.map((r) => r.lead)].join(" "));
+  return (
+    categoryIds.find((id) => {
+      const c: Category = categories[id];
+      return c.groups?.some((g) => stackGroups.has(g)) || c.keywords?.some((k) => mentions(words, k));
+    }) ?? "other"
+  );
+}
 
 // 同一内容有几种语言的版本时，优先取页面语言的，没有就取排在第一个的
 const preferLocale = <T extends { lang: Locale | null }>(locale: Locale, items: T[]) =>
@@ -201,7 +244,8 @@ export function getProjects(locale: Locale): Project[] {
     .filter((repo) => !overrides[repo.name]?.hidden)
     .map((repo) => {
       const o = overrides[repo.name] ?? {};
-      const category = categoryOf(repo, o);
+      const signals = [...Object.keys(repo.languages), ...repo.topics, ...repo.dependencies];
+      const category = categoryOf(repo, o, stackGroupsOf(signals));
       // 项目介绍：overrides 里写了就用；否则从 GitHub 简介和各语言 README 的第一段里挑页面语言的，
       // 都不是页面语言时用 GitHub 简介
       const intro = preferLocale(
@@ -221,7 +265,7 @@ export function getProjects(locale: Locale): Project[] {
         homepage: repo.homepage,
         language: repo.language,
         languages: toPercentages(repo.languages),
-        stack: stackOf(locale, [...Object.keys(repo.languages), ...repo.topics, ...repo.dependencies]),
+        stack: stackOf(locale, signals),
         topics: repo.topics,
         stars: repo.stars,
         forks: repo.forks,

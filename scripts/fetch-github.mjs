@@ -174,6 +174,10 @@ const MANIFESTS = [
   [/^pyproject\.toml$/i, pyprojectDeps],
   [/^(CMakeLists\.txt|.+\.cmake)$/i, cmakeDeps],
   [/^vcpkg\.json$/i, (text) => (JSON.parse(text).dependencies ?? []).map((d) => (typeof d === "string" ? d : d.name))],
+  // Unity 工程的 Packages/manifest.json，包名如 com.unity.xr.openxr。网页的 manifest.json 没有 dependencies，读出来是空的
+  [/^manifest\.json$/i, (text) => Object.keys(JSON.parse(text).dependencies ?? {})],
+  // Unreal 工程的 .uproject 里启用的插件，如 OpenXR、OculusXR
+  [/\.uproject$/i, (text) => (JSON.parse(text).Plugins ?? []).filter((p) => p.Enabled).map((p) => p.Name)],
 ];
 
 // 有这些文件就说明用了某样技术
