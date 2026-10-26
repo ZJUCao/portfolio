@@ -1,3 +1,4 @@
+import { ArrowUpRight, GithubLogo, LinkedinLogo } from "@phosphor-icons/react/ssr";
 import type { Metadata } from "next";
 import { Reveal } from "@/components/Reveal";
 import { contentFor } from "@/data/profile";
@@ -16,7 +17,7 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
     <>
       <Reveal>
         <h1 className="text-4xl font-semibold tracking-tight">{c.ui.contactTitle}</h1>
-        <p className="mt-4 max-w-xl text-lg leading-relaxed text-muted">{c.ui.contactIntro}</p>
+        <p className="mt-4 max-w-xl text-lg text-muted">{c.ui.contactIntro}</p>
       </Reveal>
       <Reveal delay={0.08}>
         <a
@@ -33,9 +34,11 @@ export default async function ContactPage({ params }: PageProps<"/[lang]/contact
             href={link.href}
             target="_blank"
             rel="noreferrer"
-            className="glass rounded-full px-5 py-2.5 text-sm transition-colors hover:border-accent/60"
+            className="panel inline-flex items-center gap-2 rounded-full bg-surface px-3 py-2 text-base font-semibold transition hover:bg-raised active:scale-[0.98]"
           >
-            {link.label} ↗
+            {link.label === "GitHub" ? <GithubLogo aria-hidden size={20} /> : <LinkedinLogo aria-hidden size={20} />}
+            {link.label}
+            <ArrowUpRight aria-hidden size={16} className="text-muted" />
           </a>
         ))}
       </Reveal>

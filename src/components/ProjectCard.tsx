@@ -1,6 +1,8 @@
+import { ArrowRight, Star } from "@phosphor-icons/react/ssr";
 import Link from "next/link";
 import { CoverArt } from "@/components/CoverArt";
 import { CoverImage } from "@/components/CoverImage";
+import { HudCorners } from "@/components/HudCorners";
 import { LanguageDot } from "@/components/LanguageDot";
 import { Tilt } from "@/components/Tilt";
 import type { Content } from "@/data/profile";
@@ -19,25 +21,33 @@ export function ProjectCard({ project, c }: { project: Project; c: Content }) {
       <Link
         href={`/${c.locale}/projects/${project.slug}`}
         style={{ "--tint": `var(--cat-${project.category.id})` } as React.CSSProperties}
-        className="glass group relative flex h-full flex-col overflow-hidden rounded-3xl transition-[border-color,box-shadow] duration-300 hover:border-[color-mix(in_srgb,var(--tint)_55%,transparent)] hover:shadow-[0_30px_60px_-30px_color-mix(in_srgb,var(--tint)_45%,transparent)]"
+        className="panel group relative flex h-full flex-col overflow-hidden rounded-3xl bg-surface transition hover:border-[color-mix(in_srgb,var(--tint)_55%,transparent)] hover:bg-raised active:scale-[0.98]"
       >
-        <span aria-hidden className="spotlight pointer-events-none absolute inset-0 z-10 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        <div className="relative aspect-[16/10] overflow-hidden border-b border-line bg-black/40">
-          {project.cover ? <CoverImage src={project.cover} /> : <CoverArt category={project.category.id} />}
-          <span aria-hidden className="hud-corners absolute inset-3 opacity-70 [--hud-color:var(--tint)]" />
-          <span className="absolute left-4 top-3.5 flex max-w-[calc(100%-2rem)] items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 font-mono text-[11px] text-foreground backdrop-blur">
-            <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--tint)]" />
+        <div className="relative aspect-[16/10] overflow-hidden bg-background">
+          {project.cover ? (
+            <CoverImage src={project.cover} alt={c.ui.coverAlt(project.title)} />
+          ) : (
+            <CoverArt category={project.category.id} />
+          )}
+          <HudCorners className="inset-3 opacity-70" color="var(--tint)" />
+          {/* 离卡片圆角 16px，圆角取 24 − 16 = 8px */}
+          <span className="absolute left-4 top-4 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-xs text-foreground backdrop-blur">
+            <span aria-hidden className="size-2 shrink-0 rounded-full bg-(--tint)" />
             <span className="truncate">{project.category.label}</span>
           </span>
         </div>
-        <div className="flex flex-1 flex-col p-5">
-          <div className="flex items-baseline justify-between gap-4">
+        <div className="flex flex-1 flex-col p-6">
+          <div className="flex items-center justify-between gap-4">
             <h3 className="min-w-0 truncate text-lg font-semibold tracking-tight">{project.title}</h3>
-            <span className="shrink-0 text-muted transition-transform group-hover:translate-x-0.5 group-hover:text-[var(--tint)]">→</span>
+            <ArrowRight
+              aria-hidden
+              size={20}
+              className="shrink-0 text-muted transition-transform duration-500 group-hover:translate-x-1 group-hover:text-(--tint)"
+            />
           </div>
-          <p className="mt-2 line-clamp-2 flex-1 text-sm leading-relaxed text-muted">{project.summary ?? c.ui.noDescription}</p>
+          <p className="mt-2 line-clamp-2 flex-1 text-sm text-muted">{project.summary ?? c.ui.noDescription}</p>
           {stack.length > 0 && (
-            <ul className="mt-4 flex max-h-[1.375rem] flex-wrap gap-1.5 overflow-hidden">
+            <ul className="mt-4 flex max-h-5 flex-wrap gap-2 overflow-hidden">
               {stack.map((tech) => (
                 <li key={tech} className="chip">
                   {tech}
@@ -45,9 +55,14 @@ export function ProjectCard({ project, c }: { project: Project; c: Content }) {
               ))}
             </ul>
           )}
-          <div className="mt-4 flex items-center gap-x-4 whitespace-nowrap font-mono text-xs text-muted">
+          <div className="mt-4 flex items-center gap-x-4 whitespace-nowrap text-xs text-muted tabular-nums">
             {project.language && <LanguageDot name={project.language} />}
-            {project.stars > 0 && <span>★ {project.stars}</span>}
+            {project.stars > 0 && (
+              <span className="flex items-center gap-1">
+                <Star aria-hidden size={12} weight="fill" />
+                {project.stars}
+              </span>
+            )}
             <span className="min-w-0 truncate">
               {c.ui.updated} {formatMonth(c.locale, project.pushedAt)}
             </span>

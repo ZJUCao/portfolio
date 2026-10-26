@@ -5,6 +5,9 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { Reveal } from "@/components/Reveal";
 
+// 位置变化统一用这条先快后慢的曲线
+const EASE = [0.22, 1, 0.36, 1] as const;
+
 type Props = {
   categories: { id: string; label: string; count: number }[];
   // 卡片在服务端渲染好再传进来，这里只负责按分类显示或隐藏
@@ -58,21 +61,21 @@ function FilterView({
                   aria-pressed={selected}
                   onClick={() => onSelect?.(chip.id)}
                   style={chip.id ? ({ "--tint": `var(--cat-${chip.id})` } as React.CSSProperties) : undefined}
-                  className={`relative flex items-center gap-1.5 rounded-full border bg-white/[0.03] px-3.5 py-1.5 text-sm backdrop-blur transition-colors ${
-                    selected ? "border-white/20 text-foreground" : "border-line text-muted hover:border-white/25 hover:text-foreground"
+                  className={`relative flex items-center gap-2 rounded-full border bg-surface px-3 py-2 text-sm font-semibold transition active:scale-[0.98] ${
+                    selected ? "border-white/20 text-foreground" : "border-line text-muted hover:bg-raised hover:text-foreground"
                   }`}
                 >
                   {selected && (
                     <motion.span
                       layoutId="category-pill"
-                      className="absolute inset-0 -z-10 rounded-full bg-white/10"
-                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      className="absolute inset-0 rounded-full bg-chip"
+                      transition={{ duration: 0.5, ease: EASE }}
                     />
                   )}
                   {/* 分类的标记色，和卡片封面上的一样 */}
-                  {chip.id && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--tint)]" />}
-                  {chip.label}
-                  <span className="font-mono text-xs text-muted">{chip.count}</span>
+                  {chip.id && <span aria-hidden className="relative size-2 rounded-full bg-(--tint)" />}
+                  <span className="relative">{chip.label}</span>
+                  <span className="relative text-xs font-normal text-muted tabular-nums">{chip.count}</span>
                 </button>
               );
             })}
@@ -80,14 +83,14 @@ function FilterView({
         </Reveal>
       )}
       {/* 切换分类时，留下的卡片滑到新位置，移走的淡出，新出现的由 Reveal 淡入 */}
-      <div className={`relative grid auto-rows-fr grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 ${showFilter ? "mt-6" : "mt-12"}`}>
+      <div className={`relative grid auto-rows-fr grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 ${showFilter ? "mt-6" : "mt-12"}`}>
         <AnimatePresence mode="popLayout">
           {visible.map((item, i) => (
             <motion.div
               key={item.slug}
               layout="position"
-              exit={{ opacity: 0, transition: { duration: 0.15 } }}
-              transition={{ type: "spring", stiffness: 400, damping: 36 }}
+              exit={{ opacity: 0, transition: { duration: 0.3, ease: EASE } }}
+              transition={{ duration: 0.5, ease: EASE }}
             >
               <Reveal delay={i * 0.06} className="h-full">
                 {item.card}

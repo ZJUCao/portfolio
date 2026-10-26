@@ -36,7 +36,7 @@ const groups = {
   // XR 的 SDK 和平台。Unity 包名（com.unity.xr.*）和 Unreal 插件名（OculusXR、AppleARKit）也写在 match 里
   xr: {
     zh: "XR 与空间计算",
-    en: "XR & Spatial Computing",
+    en: "XR & spatial computing",
     techs: [
       { name: "OpenXR", match: ["openxr-loader", "com.unity.xr.openxr"] },
       { name: "WebXR", match: ["@react-three/xr", "@types/webxr", "webxr-polyfill"] },
@@ -58,7 +58,7 @@ const groups = {
   },
   engines: {
     zh: "引擎与交互",
-    en: "Engines & Interaction",
+    en: "Engines & interaction",
     techs: [
       { name: "Unity", match: ["unity3d"] },
       { name: "Unreal Engine", match: ["unreal", "ue5"] },
@@ -74,7 +74,7 @@ const groups = {
   },
   perception: {
     zh: "视觉与感知",
-    en: "Vision & Perception",
+    en: "Vision & perception",
     techs: [
       { name: "OpenCV", match: ["opencv-*", "opencv4"] },
       { name: "Camera Calibration", zh: "相机标定" },
@@ -103,7 +103,7 @@ const groups = {
       { name: "Shaders", zh: "Shader", match: ["shader"] },
       { name: "Ray Tracing", zh: "光线追踪", match: ["raytracing", "ray-tracer", "raytracer"] },
       { name: "Path Tracing", zh: "路径追踪", match: ["pathtracing", "path-tracer", "pathtracer"] },
-      { name: "KD-Tree", match: ["kdtree"] },
+      { name: "KD Tree", zh: "KD 树", match: ["kdtree"] },
       { name: "BVH", match: ["bounding-volume-hierarchy"] },
       { name: "GLFW", match: ["glfw3"] },
       { name: "SDL", match: ["sdl2", "sdl3"] },
@@ -159,7 +159,7 @@ const groups = {
   // 几乎每个项目都用得上，不据此给项目分类
   systems: {
     zh: "系统与工具",
-    en: "Systems & Tools",
+    en: "Systems & tools",
     techs: [
       "Linux",
       { name: "Distributed Systems", zh: "分布式系统" },

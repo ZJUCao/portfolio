@@ -3,10 +3,10 @@ import type { CategoryId } from "@/data/projects";
 // 没有截图的项目卡片用的封面：一块透视网格地面，上面按分类画一幅线稿，颜色跟着卡片的 --tint。
 // 坐标都在 320×200 的画布里
 
-// 地面网格：横线越近越疏，竖线汇向远处的消失点
+// 地面网格：横线越近越疏，竖线汇向远处的消失点。首页 3D 画面加载前的底图也用它
 const VANISH = { x: 160, y: 95 };
 const HORIZON = 125;
-const floor = [
+export const floorPath = [
   ...[125, 133, 145, 162, 186].map((y) => `M0 ${y}H320`),
   ...Array.from({ length: 13 }, (_, k) => {
     const x = VANISH.x + (k - 6) * 64;
@@ -82,21 +82,17 @@ const art: Record<CategoryId, React.ReactNode> = {
 
 export function CoverArt({ category }: { category: CategoryId }) {
   return (
-    <div
+    <svg
       aria-hidden
-      className="absolute inset-0 bg-[radial-gradient(circle_at_50%_38%,color-mix(in_srgb,var(--tint)_20%,transparent),transparent_70%)]"
+      viewBox="0 0 320 200"
+      preserveAspectRatio="xMidYMid slice"
+      className="absolute inset-0 h-full w-full [&_*]:[vector-effect:non-scaling-stroke]"
+      fill="none"
+      stroke="var(--tint)"
+      strokeWidth="1"
     >
-      <svg
-        viewBox="0 0 320 200"
-        preserveAspectRatio="xMidYMid slice"
-        className="h-full w-full [&_*]:[vector-effect:non-scaling-stroke]"
-        fill="none"
-        stroke="var(--tint)"
-        strokeWidth="1"
-      >
-        <path d={floor} opacity="0.22" />
-        {art[category]}
-      </svg>
-    </div>
+      <path d={floorPath} opacity="0.22" />
+      {art[category]}
+    </svg>
   );
 }

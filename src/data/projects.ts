@@ -49,7 +49,7 @@ type Category = Record<Locale, string> & { topics: string[]; groups?: SkillGroup
 const categories = {
   xr: {
     zh: "XR 与空间计算",
-    en: "XR & Spatial Computing",
+    en: "XR & spatial computing",
     topics: [
       "xr", "ar", "vr", "augmented-reality", "virtual-reality", "mixed-reality", "extended-reality", "spatial-computing",
       "openxr", "webxr", "arkit", "arcore", "arfoundation", "realitykit", "visionos", "vision-pro", "oculus", "meta-quest",
@@ -65,7 +65,7 @@ const categories = {
   },
   engines: {
     zh: "引擎与交互",
-    en: "Engines & Interaction",
+    en: "Engines & interaction",
     topics: [
       "game-engine", "game-development", "gamedev", "game", "games", "ecs", "entity-component-system", "physics-engine",
       "physics", "collision-detection", "unity", "unity3d", "unreal-engine", "unreal", "godot",
@@ -74,7 +74,7 @@ const categories = {
   },
   perception: {
     zh: "视觉与感知",
-    en: "Vision & Perception",
+    en: "Vision & perception",
     topics: [
       "computer-vision", "opencv", "image-processing", "object-detection", "image-classification", "image-segmentation",
       "pose-estimation", "slam", "visual-slam", "hand-tracking", "point-cloud", "camera-calibration", "yolo", "detr",
@@ -94,7 +94,7 @@ const categories = {
   },
   tools: {
     zh: "AI 与工具",
-    en: "AI & Tools",
+    en: "AI & tools",
     topics: [
       "ai", "artificial-intelligence", "llm", "llms", "agent", "agents", "ai-agent", "ai-agents", "machine-learning",
       "deep-learning", "nlp", "rag", "ollama", "chatbot", "web", "website", "web-app", "webapp", "frontend", "backend",
@@ -126,6 +126,35 @@ type Override = {
 };
 
 const overrides: Record<string, Override> = {
+  NutriScan: {
+    en: {
+      summary:
+        "Recognizes 256 dishes from a webcam with YOLOv8 and overlays calories, protein, carbs and fat from an offline nutrition database.",
+    },
+  },
+  "SceneGraph-AR": {
+    zh: { title: "SceneGraph AR" },
+    en: {
+      title: "SceneGraph AR",
+      summary: "Calibrates a camera with OpenCV, then renders a lit scene graph that stays aligned with a printed checkerboard.",
+    },
+  },
+  "SceneGraph-Renderer": {
+    zh: { title: "SceneGraph Renderer" },
+    en: {
+      title: "SceneGraph Renderer",
+      summary:
+        "An OpenGL 3.3 scene graph renderer that runs in real time, with multiple lights, toon shading, keyframe animation and four camera modes.",
+    },
+  },
+  "SceneGraph-Ray-Tracer": {
+    zh: { title: "SceneGraph Ray Tracer" },
+    en: {
+      title: "SceneGraph Ray Tracer",
+      summary:
+        "A CPU ray tracer for scene graphs with shadows, reflection and refraction; a KD tree per mesh makes renders up to 150× faster.",
+    },
+  },
   "job-assistant": {
     featured: true,
     zh: {

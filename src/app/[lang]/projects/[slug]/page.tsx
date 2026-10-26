@@ -1,5 +1,7 @@
+import { ArrowLeft, ArrowRight, ArrowUpRight, Star } from "@phosphor-icons/react/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HudCorners } from "@/components/HudCorners";
 import { languageColor, LanguageDot } from "@/components/LanguageDot";
 import { Readme } from "@/components/Readme";
 import { Reveal } from "@/components/Reveal";
@@ -39,7 +41,11 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
     // --tint：项目所属分类的颜色，和卡片上的一样
     <article style={{ "--tint": `var(--cat-${project.category.id})` } as React.CSSProperties}>
       <Reveal>
-        <Link href={`/${lang}/projects`} className="text-sm text-muted hover:text-foreground">
+        <Link
+          href={`/${lang}/projects`}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-foreground"
+        >
+          <ArrowLeft aria-hidden size={16} />
           {c.ui.backToProjects}
         </Link>
       </Reveal>
@@ -48,19 +54,24 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
         <Reveal delay={0.04}>
           <Link
             href={`/${lang}/projects?category=${project.category.id}`}
-            className="inline-flex items-center gap-2 font-mono text-sm text-[var(--tint)] hover:underline"
+            className="inline-flex items-center gap-2 text-sm font-semibold text-(--tint) hover:underline"
           >
-            <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--tint)]" />
+            <span aria-hidden className="size-2 rounded-full bg-(--tint)" />
             {project.category.label}
           </Link>
           <h1 className="mt-3 break-words text-4xl font-semibold tracking-tight sm:text-5xl">{project.title}</h1>
         </Reveal>
         <Reveal delay={0.08}>
-          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">{project.summary ?? c.ui.noDescription}</p>
+          <p className="mt-6 max-w-2xl text-lg text-muted">{project.summary ?? c.ui.noDescription}</p>
         </Reveal>
-        <Reveal delay={0.12} className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 font-mono text-xs text-muted">
+        <Reveal delay={0.12} className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted tabular-nums">
           {project.language && <LanguageDot name={project.language} />}
-          {project.stars > 0 && <span>★ {project.stars}</span>}
+          {project.stars > 0 && (
+            <span className="flex items-center gap-1">
+              <Star aria-hidden size={16} weight="fill" />
+              {project.stars}
+            </span>
+          )}
           <span>
             {c.ui.updated} {formatMonth(c.locale, project.pushedAt)}
           </span>
@@ -70,27 +81,29 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
             href={project.url}
             target="_blank"
             rel="noreferrer"
-            className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background shadow-[0_0_32px_-8px_rgb(95_227_255/0.7)] transition-shadow hover:shadow-[0_0_40px_-4px_rgb(95_227_255/0.8)]"
+            className="inline-flex items-center gap-2 rounded-full bg-foreground px-3 py-2 text-base font-semibold text-background shadow-[0_0_32px_-8px_rgb(95_227_255/0.7)] transition hover:bg-white active:scale-[0.98]"
           >
-            {c.ui.viewOnGithub} ↗
+            {c.ui.viewOnGithub}
+            <ArrowUpRight aria-hidden size={20} />
           </a>
           {project.homepage && (
             <a
               href={project.homepage}
               target="_blank"
               rel="noreferrer"
-              className="glass rounded-full px-5 py-2.5 text-sm font-medium transition-colors hover:border-accent/60"
+              className="panel inline-flex items-center gap-2 rounded-full bg-surface px-3 py-2 text-base font-semibold transition hover:bg-raised active:scale-[0.98]"
             >
-              {c.ui.liveDemo} ↗
+              {c.ui.liveDemo}
+              <ArrowUpRight aria-hidden size={20} />
             </a>
           )}
         </Reveal>
       </header>
 
       {project.video && (
-        <Reveal className="mt-14">
-          <h2 className="text-sm font-medium text-muted">{c.ui.demoVideo}</h2>
-          <div className="glass mt-4 aspect-video overflow-hidden rounded-3xl">
+        <Reveal className="mt-16">
+          <h2 className="text-sm font-semibold text-muted">{c.ui.demoVideo}</h2>
+          <div className="panel mt-4 aspect-video overflow-hidden rounded-3xl bg-surface">
             <iframe
               src={project.video.embedUrl}
               title={`${project.title} — ${c.ui.demoVideo}`}
@@ -103,11 +116,11 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
         </Reveal>
       )}
 
-      <div className="mt-14 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <div className="mt-16 grid gap-8 lg:grid-cols-[minmax(0,1fr)_260px]">
         <Reveal className="min-w-0">
-          <section className="glass relative rounded-3xl p-6 sm:p-8">
-            <span aria-hidden className="hud-corners absolute inset-3 opacity-50 [--hud-color:var(--tint)]" />
-            <h2 className="font-mono text-xs uppercase tracking-wider text-muted">{c.ui.readme}</h2>
+          <section className="panel relative rounded-3xl bg-surface p-6 sm:p-8">
+            <HudCorners className="inset-3 opacity-50" color="var(--tint)" />
+            <h2 className="text-sm font-semibold text-muted">{c.ui.readme}</h2>
             {project.readme ? (
               <>
                 {project.readme.lang && project.readme.lang !== c.locale && (
@@ -125,16 +138,16 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
           </section>
         </Reveal>
         <Reveal className="min-w-0">
-          <aside className="glass space-y-8 rounded-3xl p-6 lg:sticky lg:top-24">
+          <aside className="panel space-y-8 rounded-3xl bg-surface p-6 lg:sticky lg:top-24">
             {project.languages.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium">{c.ui.languages}</h2>
-                <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-line">
+                <h2 className="text-sm font-semibold">{c.ui.languages}</h2>
+                <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-chip">
                   {project.languages.map((l) => (
                     <span key={l.name} style={{ width: `${l.percent}%`, backgroundColor: languageColor(l.name) }} />
                   ))}
                 </div>
-                <ul className="mt-3 space-y-1.5 font-mono text-xs text-muted">
+                <ul className="mt-3 space-y-2 text-xs text-muted tabular-nums">
                   {project.languages.slice(0, 6).map((l) => (
                     <li key={l.name} className="flex justify-between gap-2">
                       <LanguageDot name={l.name} />
@@ -147,7 +160,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
 
             {project.stack.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium">{c.ui.stack}</h2>
+                <h2 className="text-sm font-semibold">{c.ui.stack}</h2>
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {project.stack.map((tech) => (
                     <li key={tech} className="chip">
@@ -159,8 +172,8 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
             )}
 
             <section>
-              <h2 className="text-sm font-medium">{c.ui.details}</h2>
-              <dl className="mt-3 space-y-1.5 font-mono text-xs">
+              <h2 className="text-sm font-semibold">{c.ui.details}</h2>
+              <dl className="mt-3 space-y-2 text-xs tabular-nums">
                 {facts.map((f) => (
                   <div key={f.label} className="flex justify-between gap-2">
                     <dt className="text-muted">{f.label}</dt>
@@ -172,7 +185,7 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
 
             {project.topics.length > 0 && (
               <section>
-                <h2 className="text-sm font-medium">{c.ui.topics}</h2>
+                <h2 className="text-sm font-semibold">{c.ui.topics}</h2>
                 <ul className="mt-3 flex flex-wrap gap-2">
                   {project.topics.map((topic) => (
                     <li key={topic} className="chip">
@@ -190,16 +203,22 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
       {(prev || next) && (
         <nav className="mt-16 grid gap-4 border-t border-line pt-8 sm:grid-cols-2">
           {prev ? (
-            <Link href={`/${lang}/projects/${prev.slug}`} className="group rounded-2xl p-4 transition-colors hover:bg-white/5">
-              <span className="text-xs text-muted">← {c.ui.prevProject}</span>
+            <Link href={`/${lang}/projects/${prev.slug}`} className="group rounded-2xl p-4 transition-colors hover:bg-surface">
+              <span className="flex items-center gap-1 text-xs text-muted">
+                <ArrowLeft aria-hidden size={12} />
+                {c.ui.prevProject}
+              </span>
               <span className="mt-1 block font-semibold group-hover:text-accent">{prev.title}</span>
             </Link>
           ) : (
             <span />
           )}
           {next && (
-            <Link href={`/${lang}/projects/${next.slug}`} className="group rounded-2xl p-4 text-right transition-colors hover:bg-white/5">
-              <span className="text-xs text-muted">{c.ui.nextProject} →</span>
+            <Link href={`/${lang}/projects/${next.slug}`} className="group rounded-2xl p-4 text-right transition-colors hover:bg-surface">
+              <span className="flex items-center justify-end gap-1 text-xs text-muted">
+                {c.ui.nextProject}
+                <ArrowRight aria-hidden size={12} />
+              </span>
               <span className="mt-1 block font-semibold group-hover:text-accent">{next.title}</span>
             </Link>
           )}

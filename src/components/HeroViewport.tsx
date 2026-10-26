@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { floorPath } from "@/components/CoverArt";
+import { HudCorners } from "@/components/HudCorners";
 import type { XRMode } from "@/components/heroScene";
 
 export type HudLabels = { scene: string; tracking: string; board: string; hint: string; ar: string; vr: string };
 
 // 首页的 3D 取景框。画面由 heroScene.ts 用 three.js 画，这里负责四周的 HUD 和进入 AR / VR 的按钮。
-// three.js 等组件挂载后才加载；加载完之前、或者浏览器不支持 WebGL 时，显示一块静态的透视网格
+// three.js 等组件挂载后才加载；加载完之前、或者浏览器不支持 WebGL 时，显示一块静态的透视网格（和卡片线稿同一张）
 export function HeroViewport({ labels }: { labels: HudLabels }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const fpsRef = useRef<HTMLSpanElement>(null);
@@ -58,29 +60,39 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
     enterXR.current?.(mode).catch((error) => console.warn("Could not start the XR session:", error));
 
   return (
-    <div className="glass relative aspect-[4/3] overflow-hidden rounded-[28px] sm:aspect-[16/10] lg:aspect-auto lg:h-[500px]">
-      <div aria-hidden className="grid-floor absolute -inset-x-1/2 bottom-0 h-[70%]" />
+    <div className="panel relative aspect-[4/3] overflow-hidden rounded-3xl bg-background sm:aspect-[16/10] lg:aspect-auto lg:h-[500px]">
+      <svg
+        aria-hidden
+        viewBox="0 0 320 200"
+        preserveAspectRatio="xMidYMax slice"
+        className="absolute inset-0 h-full w-full [&_*]:[vector-effect:non-scaling-stroke]"
+        fill="none"
+        stroke="var(--accent)"
+      >
+        <path d={floorPath} opacity="0.25" />
+      </svg>
       <div
         ref={mountRef}
         role="img"
         aria-label={labels.scene}
-        className={`absolute inset-0 transition-opacity duration-1000 ${ready ? "opacity-100" : "opacity-0"}`}
+        className={`absolute inset-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
       />
-      <span aria-hidden className="hud-corners absolute inset-4" />
+      <HudCorners className="inset-4" />
 
-      <div className="pointer-events-none absolute inset-x-6 top-5 flex items-center justify-between gap-4 font-mono text-[11px] uppercase tracking-wider text-muted sm:inset-x-8 sm:top-7">
+      <div className="pointer-events-none absolute inset-x-6 top-4 flex items-center justify-between gap-4 text-xs text-muted sm:inset-x-8 sm:top-6">
         <span className="flex items-center gap-2">
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--cat-perception)] motion-safe:animate-pulse" />
+          <span aria-hidden className="size-2 rounded-full bg-(--cat-perception) motion-safe:animate-pulse" />
           {labels.tracking}
           <span className="hidden sm:inline">· {labels.board}</span>
         </span>
-        <span ref={fpsRef} className="tabular-nums">
+        {/* 帧率和位姿是一直在跳的数字，用等宽字体免得来回抖 */}
+        <span ref={fpsRef} className="font-mono tabular-nums">
           — FPS
         </span>
       </div>
 
-      <div className="absolute inset-x-6 bottom-5 flex items-end justify-between gap-4 font-mono text-[11px] text-muted sm:inset-x-8 sm:bottom-7">
-        <span ref={poseRef} className="pointer-events-none tabular-nums" />
+      <div className="absolute inset-x-6 bottom-4 flex items-end justify-between gap-4 text-xs text-muted sm:inset-x-8 sm:bottom-6">
+        <span ref={poseRef} className="pointer-events-none font-mono tabular-nums" />
         {xrModes.length > 0 ? (
           <span className="flex shrink-0 gap-2">
             {xrModes.map((mode) => (
@@ -88,7 +100,7 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
                 key={mode}
                 type="button"
                 onClick={() => start(mode)}
-                className="rounded-full border border-accent/60 bg-accent/10 px-3 py-1.5 text-xs text-accent transition-colors hover:bg-accent/20"
+                className="rounded-full border border-accent/60 bg-background px-3 py-2 text-sm font-semibold text-accent transition-colors hover:bg-surface active:scale-[0.98]"
               >
                 {mode === "immersive-ar" ? labels.ar : labels.vr}
               </button>

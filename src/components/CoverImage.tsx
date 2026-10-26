@@ -17,19 +17,19 @@ function fit(img: HTMLImageElement | null) {
   img.style.opacity = "1";
 }
 
-export function CoverImage({ src }: { src: string }) {
+export function CoverImage({ src, alt }: { src: string; alt: string }) {
   return (
     // 静态导出没有图片优化服务，直接用原图地址。图片在 React 接管页面前就加载完时 onLoad 不会触发，由 ref 补上
     // eslint-disable-next-line @next/next/no-img-element
     <img
       ref={fit}
       src={src}
-      alt=""
+      alt={alt}
       loading="lazy"
       decoding="async"
       onLoad={(event) => fit(event.currentTarget)}
       style={{ opacity: 0 }}
-      className="absolute right-0 top-0 h-full w-full max-w-none object-cover transition-[opacity,transform] duration-700 group-hover:scale-[1.04]"
+      className="absolute right-0 top-0 h-full w-full max-w-none object-cover transition-[opacity,scale] duration-700 group-hover:scale-[1.04]"
     />
   );
 }
