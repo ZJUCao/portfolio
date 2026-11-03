@@ -1,6 +1,6 @@
 # Design: Camera AR on a calibration board
 
-Status: **Confirmed 2026-11-02**, P1 in progress · Tier: Full · Phases: P1–P4 (§10)
+Status: **Confirmed 2026-11-02**, P1 and P2a done, P2b in progress · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
 
 ## 1. Goal
 
@@ -151,15 +151,16 @@ export function cameraPosition(pose: Pose): Float64Array;
 
 `solvePlanarPnP`
 - Preconditions, otherwise `RangeError`: both arrays have the same even length 2N with N ≥ 4, all values finite, all intrinsics finite with fx, fy > 0. Object points lie on the board plane Z = 0.
-- Returns `null` when the problem is degenerate: no four object points are in general position (no three on a line), or there is no finite solution with the board in front of the camera.
+- Returns `null` when the problem is degenerate: no four object points are in general position (no three on a line), no four image points are (OQ-61), or there is no finite solution with the board entirely in front of the camera (OQ-67). It also returns `null` when the board points are in front of the camera but the board origin is not, so that t_z > 0 holds; only object points far from their origin can cause this, and `boardCorners()` are centred on it (OQ-69).
 - Postconditions: R is orthonormal (max |RᵀR − I| ≤ 1e−9) with det R = +1; t_z > 0; `rms` is the square root of the mean squared pixel distance between `imageXY` and K(R · [X Y 0]ᵀ + t).
 - Accuracy: on exact projections the rotation error is ≤ 1e−6 rad and |t − t_true| ≤ 1e−6 · |t_true| (scope: OQ-19). With σ = 0.3 px noise on the 54 corners, the board spanning at least a third of the image width and the true K, in each of 20 seeded trials: rotation error ≤ 0.5° for tilt 35–60° and ≤ 3° for tilt 0–35°, because a near-frontal planar target constrains rotation poorly (OQ-18); translation error ≤ 1 % of |t_true| for tilt 0–60°.
 - The final pose minimises pixel reprojection error, so its `rms` is no larger than that of the homography-only estimate.
 
 `estimateFocal`
 - Estimates the focal length in pixels from the board-to-image homography, assuming square pixels, zero skew and the principal point at ((width − 1) / 2, (height − 1) / 2). Same `RangeError` rules as `solvePlanarPnP`, plus positive width and height.
-- Tilt here is the angle between the board normal and the camera's optical axis (OQ-23). Returns `null` when the view is close to fronto-parallel: always for tilt < 10°, possibly for tilt 10–25°. With tilt 25–60°, exact or σ ≤ 0.3 px data and the board spanning at least 40 % of the image width, it returns a value (OQ-24). It also returns `null` for degenerate point sets (OQ-25) and when the estimate is not finite and positive.
+- Tilt here is the angle between the board normal and the camera's optical axis (OQ-23). The guarantees below assume a true horizontal field of view of 40–100°, the clamp range of D1 (OQ-62). Returns `null` when the view is close to fronto-parallel: for tilt < 10° always with exact data, whatever the board's size, and with σ ≤ 0.3 px noise when the board spans at least 40 % of the image width (OQ-62); possibly for tilt 10–25°. With tilt 25–60°, exact or σ ≤ 0.3 px data and the board spanning at least 40 % of the image width, it returns a value (OQ-24). Outside these conditions it may return `null` or a value. It also returns `null` for degenerate point sets (OQ-25) and when the estimate is not finite and positive.
 - Accuracy: exact data with tilt ≥ 30°: within 1 % of the true focal length. σ = 0.3 px noise, tilt 45°, board spanning at least 40 % of the image width: within 10 % in each of 20 seeded trials.
+- Scale invariance: multiplying every object point by the same factor s > 0 changes the estimate by at most 1e−9 relative, for exact and noisy data alike (OQ-63).
 
 `viewMatrix`: a new 16-element column-major matrix (the `THREE.Matrix4` element order) V such that for every scene point p = (x, y, z), V · [p, 1] = [F · (R · B · p + t), 1], where B = [[1, 0, 0], [0, 0, 1], [0, −1, 0]] maps scene to board coordinates and F = diag(1, −1, −1) maps the OpenCV camera to the three.js camera (§6).
 
@@ -168,7 +169,7 @@ export function cameraPosition(pose: Pose): Float64Array;
 - y_ndc = −(2 s fy / H) · (Y / Z) − (s / H) · (2 cy + 1 − h)
 - depth: near maps to −1 and far to +1 (OpenGL convention).
 
-`RangeError` for non-positive sizes or unless 0 < near < far.
+`RangeError` when a size is not positive and finite, when K has a non-finite value or fx or fy ≤ 0 (OQ-70), or unless near and far are finite with 0 < near < far (OQ-22, OQ-64).
 
 `cameraPosition`: the camera centre in scene coordinates, B⁻¹ · (−Rᵀ t), as a new 3-element array. The HUD converts it to metres (× 0.025 / 0.24) and yaw (atan2(x, z) in degrees), the same way the hero scene does today.
 
@@ -363,6 +364,7 @@ All copy lives in `profile.ts` under `ui.hud.camera` (the button) and `ui.hud.ca
 | Scene | The board lies on y = 0; board X = scene x, board Y = scene z, board Z = −scene y, hence B |
 | Units | Board and scene units, 0.24 per square; metres = units × 0.025 / 0.24 |
 | Cover fit | s = max(W / w, H / h), image centred in the viewport (§5.3) |
+| Board size in the image | "The board spans x % of the image width" is measured at the outer edge of the 10 × 7 squares; the 54 inner corners span 80 % of that (OQ-65) |
 
 ## 7. Algorithm notes
 
@@ -378,9 +380,9 @@ Detector (`chessboard.ts`):
 7. Ordering: transpose so that i runs along cornersX; flip i when the lattice is mirrored (O2); rotate by 180° when the squares that should be dark are lighter on average than those that should be light (O3).
 8. Tracking: with `previous`, refine each previous corner in place, then validate (spacing, homography residual, polarity, colour check); on any failure run the full detector.
 
-Pose (`pose.ts`): normalised DLT homography (Hartley normalisation) → decomposition with K⁻¹ → orthonormalise R (polar decomposition) → enforce t_z > 0 → Gauss–Newton or Levenberg–Marquardt on (rotation vector, t), at most 10 iterations. Symmetric 9 × 9 and 3 × 3 eigenproblems by Jacobi rotations, with no linear-algebra dependency.
+Pose (`pose.ts`): normalised DLT homography (Hartley normalisation) → decomposition with K⁻¹ → orthonormalise R (polar decomposition) → enforce t_z > 0 → Gauss–Newton or Levenberg–Marquardt on (rotation vector, t) until the step is negligible (board data typically converges in fewer than 10 iterations). Symmetric 9 × 9 and 3 × 3 eigenproblems by Jacobi rotations, with no linear-algebra dependency.
 
-Focal (`estimateFocal`): with pixel coordinates centred on the principal point, the homography's columns h1, h2 satisfy h1ᵀ ω h2 = 0 and h1ᵀ ω h1 = h2ᵀ ω h2 with ω = diag(1/f², 1/f², 1). Solve for 1/f² by least squares; reject when the perspective terms (h31, h32) are small relative to the others (near fronto-parallel) or when 1/f² ≤ 0.
+Focal (`estimateFocal`): with pixel coordinates centred on the principal point, the homography's columns h1, h2 satisfy h1ᵀ ω h2 = 0 and h1ᵀ ω h1 = h2ᵀ ω h2 with ω = diag(1/f², 1/f², 1). Solve for 1/f² by least squares from a normalised (Hartley) homography fit, which keeps the estimate independent of the scale of the object points (OQ-63); reject when 1/f² ≤ 0 or the view is near fronto-parallel. The fronto-parallel test must hold across 40–100° fields of view (OQ-62): the size of (h31, h32) relative to the other entries depends on the focal length, so a test on that ratio alone misjudges wide-angle views. The tilt τ can be read from the centred homography without knowing f: with A1 = h11 h12 + h21 h22, A2 = h11² + h21² − h12² − h22² and N = h11² + h21² + h12² + h22², ρ = √(A1² + A2²/4) / N gives sin² τ = 4ρ / (1 + 2ρ), exactly for exact data. Under noise a small board makes ρ unreliable, which is why the noisy guarantee needs the board to span at least 40 % of the width.
 
 Corner filter (`createCornerFilter`): take each coordinate's derivative against the previous filtered value, not the previous raw value. With the raw-value formulation the step clause of §5.4 fails at the default parameters (OQ-27).
 
@@ -433,12 +435,13 @@ Seams for tests: `startCameraAR` takes its dependencies (media devices, worker f
 
 | Phase | Source files | Changed lines (est.) | Site after the phase |
 | :--- | :--- | :--- | :--- |
-| P1 Detector | `src/ar/board.ts`, `src/ar/chessboard.ts` | ~430 | unchanged (new modules unused) |
-| P2 Pose and worker pipeline | `src/ar/pose.ts`, `src/ar/pipeline.ts`, `src/ar/tracker.worker.ts` | ~400 | unchanged |
+| P1 Detector | `src/ar/board.ts`, `src/ar/chessboard.ts` | ~430 (762 as built) | unchanged (new modules unused) |
+| P2a Pose (§5.3) | `src/ar/pose.ts` | ~500 | unchanged |
+| P2b Worker pipeline (§5.4) | `src/ar/pipeline.ts`, `src/ar/tracker.worker.ts` | ~300 | unchanged |
 | P3 Camera AR overlay | `src/ar/tracker.ts`, `src/components/CameraAR.tsx`, `src/components/heroScene.ts`, `src/components/HeroViewport.tsx`, `src/data/profile.ts` | ~490 | camera AR works with a printed board |
 | P4 Board view, QR, PDF | `src/components/CameraAR.tsx`, `src/components/HeroViewport.tsx`, `src/app/chessboard.pdf/route.ts`, `src/data/profile.ts` | ~180 | the full feature |
 
-About 1,500 changed source lines in 11 files, tests, docs and build files excluded. Each phase goes through skeleton → tests (Red) → implementation (Green) → verification, and stops for review before the next starts.
+About 2,200 changed source lines in 11 files (P1 as built, the rest estimated), tests, docs and build files excluded. P1 came in at 762 lines against an estimate of 430, so P2 was re-estimated at about 800 lines before it started and split into P2a and P2b (confirmed 2026-11-02). Each phase goes through skeleton → tests (Red) → implementation (Green) → verification, and stops for review before the next starts.
 
 ## 11. Assumptions
 
@@ -465,14 +468,15 @@ About 1,500 changed source lines in 11 files, tests, docs and build files exclud
 
 ## 13. Progress
 
-- [x] P1 Detector: green on 2026-11-02 (84 passed, 8 photo cases skipped until fixtures exist); awaiting review
-- [ ] P2 Pose and worker pipeline
+- [x] P1 Detector: green on 2026-11-02 (84 passed, 8 photo cases skipped until fixtures exist); reviewed and committed as `b98e03c` on `claude/camera-ar`
+- [x] P2a Pose: green on 2026-11-02 (45 pose tests pass; full suite 129 passed, 8 skipped); reviewed and committed on `claude/camera-ar`
+- [ ] P2b Worker pipeline
 - [ ] P3 Camera AR overlay
 - [ ] P4 Board view, QR, PDF
 
 ## 14. Resolved details
 
-Raised by the test plan and resolved on 2026-11-02. Each line is part of the contract.
+Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day. Each line is part of the contract.
 
 | # | Area | Resolution |
 | :--- | :--- | :--- |
@@ -536,3 +540,13 @@ Raised by the test plan and resolved on 2026-11-02. Each line is part of the con
 | OQ-58 | `?ar` values | Unknown values are ignored; `?ar=camera` without camera support shows `unsupported` |
 | OQ-59 | Board view | "Use this device's camera" is hidden without camera support; the wake lock is released on leaving the board view or closing |
 | OQ-60 | Worker bundling | P2 adds a temporary reference to check `next build` and removes it afterwards |
+| OQ-61 | PnP degeneracy | Also degenerate, so `null`: no four image points with no three on a line |
+| OQ-62 | Focal envelope | The `estimateFocal` guarantees assume a true horizontal field of view of 40–100°. Tilt < 10° gives `null` with exact data at any board size, and with σ ≤ 0.3 px when the board spans ≥ 40 % of the width. P2-FOC-04…06 and P2-FOC-10 draw the field of view from 40–100° |
+| OQ-63 | Focal scale invariance | Scaling the object points changes the estimate by ≤ 1e−9 relative, with or without noise |
+| OQ-64 | Infinite far plane | `projectionMatrix` requires finite near and far; far = Infinity throws `RangeError` |
+| OQ-65 | Board size in the image | Measured at the outer edge of the 10 × 7 squares (§6) |
+| OQ-66 | PnP local minimum (test) | P2-PNP-11 turns R about the camera axes through the board origin (R ← Rot · R, t fixed) and moves one component of t at a time |
+| OQ-67 | Board behind the camera, refines OQ-21 | A board entirely behind the camera projects like its point reflection in front of it, so OQ-21 means correspondences that no board entirely in front explains: a board straddling the camera's z = 0 plane gives `null` |
+| OQ-68 | Extra P2a inputs (test) | Kept: hfov −Infinity (P2-INT-03), height 360.5 (P2-INT-04), 5 exact and 5 noisy trials per tilt (P2-FOC-05), four image-corner directions with a 20 % board (P2-FOC-07), one noisy input (P2-PNP-14) |
+| OQ-69 | Board origin behind the camera | When the board points are in front of the camera but the board origin is not, `solvePlanarPnP` returns `null`, keeping t_z > 0 |
+| OQ-70 | `projectionMatrix` intrinsics | K is validated as in `solvePlanarPnP`: a non-finite value or fx, fy ≤ 0 throws `RangeError` |

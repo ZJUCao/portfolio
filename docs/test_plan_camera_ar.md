@@ -1,8 +1,8 @@
 # Test plan: Camera AR on a calibration board
 
-Status: **Confirmed on 2026-11-02**; P1 tests written and red against the skeleton (this plan §9) · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
+Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
 
-This plan maps the contracts of the design (§5, with the conventions of §6 and the strategy of §9) to test cases, phase by phase (§10 of the design). Decisions D1–D14 are option A. The 60 questions the contract left open are resolved (this plan §10): option A for all except OQ-04, OQ-06, OQ-09, OQ-27 and OQ-47. Section numbers such as "§5.2" refer to the design; "this plan §x" refers to this document.
+This plan maps the contracts of the design (§5, with the conventions of §6 and the strategy of §9) to test cases, phase by phase (§10 of the design). Decisions D1–D14 are option A. The 60 questions the contract left open are resolved (this plan §10): option A for all except OQ-04, OQ-06, OQ-09, OQ-27 and OQ-47. OQ-61–OQ-68, raised while writing the P2a tests, and OQ-69–OQ-70, raised in their review, are all option A. Section numbers such as "§5.2" refer to the design; "this plan §x" refers to this document.
 
 Cases removed by the resolutions, whose IDs are not reused: P1-DET-11 (OQ-09), P2-PNP-06 (OQ-19), P3-TRK-41 (OQ-47), P3-COPY-01, P3-COPY-02 and P4-COPY-01 (OQ-04), and M3-20 (OQ-03).
 
@@ -32,7 +32,7 @@ Cases removed by the resolutions, whose IDs are not reused: P1-DET-11 (OQ-09), P
 | `tests/ar/tracker.test.ts` | P3-TRK | P3 |
 | `tests/app/chessboard-pdf.test.ts` | P4-PDF | P4 |
 
-Helpers live in `tests/ar/helpers/`: `random.ts`, `boardModel.ts`, `linalg.ts`, `render.ts`, `scenes.ts`, `catalog.ts` (every P1 scene), `metrics.ts`, `fixtures.ts` (photo loading), and from P3 `cameraFakes.ts`. The PDF reader sits next to its only user, in `tests/app/helpers/pdf.ts`. Real photos and their manifest go to `tests/fixtures/board/`.
+Helpers live in `tests/ar/helpers/`: `random.ts`, `boardModel.ts`, `linalg.ts`, `render.ts`, `scenes.ts`, `catalog.ts` (every P1 scene), `metrics.ts`, `fixtures.ts` (photo loading), `poses.ts` and `poseCatalog.ts` (P2: pose maths and every seeded P2a input), and from P3 `cameraFakes.ts`. The PDF reader sits next to its only user, in `tests/app/helpers/pdf.ts`. Real photos and their manifest go to `tests/fixtures/board/`.
 
 Module mocks (`vi.mock`) appear only in `pipeline.spy.test.ts`, and only for calls that §5.4 itself specifies: the detector call with its hint, `estimateFocal` and `solvePlanarPnP`. Everything else goes through the public interfaces.
 
@@ -110,7 +110,7 @@ Note on mirroring: the 10×7 board's colouring is symmetric about its long axis,
 - `moveScene(scene, kind, direction, shift)`: translation, rotation, scale or tilt change, bisected so that the largest corner displacement equals `shift` × the shortest projected square edge (OQ-15); `shiftInSquares` measures it.
 - `catalog.ts` holds every scene of the P1 detector tests as an item with a label, render options, the requested lattice size and a check of what its test needs (nominal; off-nominal for the intended reason only; no board; a corner ≥ 4 px outside; the closest corner within a given band; a moved scene's measured shift). Helper self-test H-11 runs every check from the geometry alone, without calling the detector. `renderItem` draws each item once per test file.
 
-### 2.5 Metrics and assertions (`metrics.ts`, `linalg.ts`)
+### 2.5 Metrics, assertions and pose helpers (`metrics.ts`, `linalg.ts`, `poses.ts`, `poseCatalog.ts`)
 
 - `cornerErrors(result, truth)`: per-corner distances, RMS and maximum.
 - `expectLayout`, `expectAccurate`, `expectIdentityCorrect` and their `expectNullOr…` forms; `expectAccurate` also runs `expectOrderProperties` (O2 from the cross product at corner 0, O3 from the image).
@@ -119,6 +119,8 @@ Note on mirroring: the 10×7 board's colouring is symmetric about its long axis,
 - `rotationAngle(Ra, Rb)` = atan2(‖vee(M − Mᵀ)‖ / 2, (tr M − 1) / 2) with M = Ra · Rbᵀ, accurate near 1e−6 rad (for P2).
 - `expectRangeError(call)`: passes on a `RangeError` and rethrows any other exception unchanged, so in the Red run a validation case fails with the stub's own "not implemented".
 - `bytesOf(view)` copies the bytes behind a typed array for immutability checks; `toFloat32` builds hints.
+- `poses.ts` (P2): seeded board placements (`samplePose` within an envelope, `placeRotated` for a given rotation), exact pinhole projection that does not check the sign of z, Gaussian pixel noise, the reprojection RMS of §5.3, the homography-only pose that P2-PNP-10 compares against (K⁻¹ times the `fitHomography` result, λ from the mean of the two column norms with t_z > 0, R the nearest rotation by polar decomposition), the §6 matrices B and F, column-major 4 × 4 products and determinant, and the cover-fit mapping from pixels to NDC derived from the layout rather than from the §5.3 formulas.
+- `poseCatalog.ts` (P2): every seeded P2a input, one stream per trial (`seedFor` of the trial label), so the tests of a group share their trials and an offline check can replay them.
 
 ### 2.6 Fakes for `startCameraAR` (`cameraFakes.ts`, P3)
 
@@ -331,15 +333,18 @@ The phone figure (≥ 20 results per second) is checked manually (M3-15, M3-16).
 | P2-PNP-08 | `rms` definition | The test recomputes sqrt((1/N) · Σ ‖imageXY_k − K(R [X Y 0]ᵀ + t)‖²), the mean over N points | Equals `rms` within 1e−9 relative |
 | P2-PNP-09 | Noisy accuracy (OQ-18) | σ 0.3 px on the 54 corners, true K, board ≥ 1/3 of the width; 20 seeded trials with tilt 35–60° and 20 with tilt 0–35° | Tilt 35–60°: rotation ≤ 0.5°; tilt 0–35°: rotation ≤ 3°; translation ≤ 1 % of ‖t_true‖ in both |
 | P2-PNP-10 | Minimises pixel error | The 40 noisy trials | `rms` ≤ the true pose's rms + 1e−9, and ≤ the rms of the helper's homography-only pose + 1e−9 |
-| P2-PNP-11 | Local minimum | Rotation perturbed by ±1e−4 rad about each axis, t by ±1e−4 · ‖t‖ per component | `rms` never lower by more than 1e−9 relative |
-| P2-PNP-12 | Degenerate → null (OQ-20) | All object points collinear; all image points collinear; all image points equal; 4 copies of 2 points; 4 points with 3 collinear | null |
-| P2-PNP-13 | Board behind the camera (OQ-21) | Image points from the point reflection −P of a valid projection | null |
+| P2-PNP-11 | Local minimum (OQ-66) | Rotation perturbed by ±1e−4 rad about each axis, t by ±1e−4 · ‖t‖ per component | `rms` never lower by more than 1e−9 relative |
+| P2-PNP-12 | Degenerate → null (OQ-20, OQ-61) | All object points collinear; all image points collinear; all image points equal; 4 copies of 2 points; 4 points with 3 collinear | null |
+| P2-PNP-13 | Board behind the camera (OQ-21, OQ-67) | A rigid board whose plane crosses the camera's z = 0 plane between two rows or columns of corners, so some corners have Z > 0 and others Z < 0 (abs(Z) ≥ 0.1, every pixel finite), projected with the pinhole formula. Three cases: rows 0–1 behind with the board origin in front; only row 5 behind with the origin in front; columns 3–8 behind with the origin behind. No board entirely in front of the camera reproduces these pixels | null |
 | P2-PNP-14 | §8 pure function | Same inputs twice; byte copies of the inputs | Bitwise-identical R, t, rms; inputs unchanged |
 | P2-PNP-15 | Scale invariance | Object points × 7 with t_true × 7, exact data | Same R; t × 7 within 1e−6 relative |
+| P2-PNP-16 | Board origin behind the camera (OQ-69) | The 54 corners shifted 6 along X, 8 along Y and 7 along a diagonal, so the nearest is at least 5 board units from the origin of their coordinates, seen at tilt 30°, 40° and 50° with every corner in front of the camera (z ≥ 1.5) and that origin behind it (t_z −1.0, −2.6, −2.4); exact projections | null; the same pixels with the corners' own centred coordinates give the true pose within the P2-PNP-03 bounds |
+
+Notes. P2-PNP-09…11 share the 40 trials, in the setting of this plan §10.1: 640×360, hfov 60°, board centred with its squares spanning exactly 1/3 of the width, random tilt axis and in-plane rotation. P2-PNP-11 turns R about each camera axis through the board origin (R ← Rot(±10⁻⁴) · R, t fixed) and moves one component of t at a time. P2-PNP-13 replaces its first construction, the point reflection −P of a valid projection: perspective division cancels the sign (u = fx · (−X)/(−Z) + cx), so those pixels are the valid projection's own and a board in front of the camera explains them.
 
 ### 4.3 `estimateFocal` (§5.3)
 
-In this section tilt is the angle between the board normal and the optical axis (OQ-23).
+In this section tilt is the angle between the board normal and the optical axis (OQ-23). Noisy trials use the OQ-24 envelope at its limits: 640×360, board centred with its squares spanning exactly 40 % of the width, σ 0.3 px. The exact trials of P2-FOC-04…06 vary the board between 40 % and 90 % of the width and its centre within ±15 % of the image size. The true hfov is drawn from 40–100° (the clamp range of D1, OQ-62) in P2-FOC-04…06 and P2-FOC-10; P2-FOC-03 keeps hfov 60°, the setting of this plan §10.1.
 
 | ID | Clause | Setup / input | Expected |
 | :--- | :--- | :--- | :--- |
@@ -367,7 +372,7 @@ In this section tilt is the angle between the board normal and the optical axis 
 | P2-PM-03 | Cover edges | Wide viewport 1920×800 (s = W/w); tall viewport 390×844 (s = H/h) | Wide: u = −0.5 → x_ndc = −1 and u = w − 0.5 → +1. Tall: v = −0.5 → y_ndc = +1 and v = h − 0.5 → −1 |
 | P2-PM-04 | Depth | Z = near, Z = far, points in between | z_ndc = −1 and +1 within 1e−9; increasing with Z |
 | P2-PM-05 | Usable by WebGL (OQ-26) | Points with Z > 0 | Clip w = k · Z with k > 0; det P ≠ 0 |
-| P2-PM-06 | `RangeError` (OQ-22) | Image or viewport width or height 0, −1, NaN, ±Infinity; near 0, −1; near = far; near > far; near or far NaN | `RangeError` |
+| P2-PM-06 | `RangeError` (OQ-22, OQ-64, OQ-70) | Image or viewport width or height 0, −1, NaN, ±Infinity; near 0, −1; near = far; near > far; near or far NaN; far = Infinity; K with fx 0 or −1, fy 0 or −1, fx NaN, fy Infinity, cx NaN or Infinity, cy −Infinity, the other arguments valid | `RangeError` |
 | P2-PM-07 | Shape, use in three.js | Any valid input | `Float64Array(16)`, new per call; through `Matrix4.fromArray` and `Vector3.applyMatrix4` (which divides by w), the same NDC |
 | P2-CP-01 | `cameraPosition` formula | 20 random poses | B⁻¹ · (−Rᵀ t) within 1e−12; a new `Float64Array(3)` per call |
 | P2-CP-02 | Consistent with `viewMatrix` | Same poses | V · [c, 1] = (0, 0, 0, 1) within 1e−9 |
@@ -669,19 +674,31 @@ Not automated: WebGL output (§5.6), UI behaviour U1–U12 (§5.7, copy included
 | Phase | Automated contract cases | Helper self-tests | Real-photo cases (D12) | Manual |
 | :--- | ---: | ---: | ---: | ---: |
 | P1 | 75 | 9 (H-01…H-08, H-11) | 8 | 1 |
-| P2 | 105 | 0 | — | 2 |
+| P2 | 106 | 0 | — | 2 |
 | P3 | 41 | 1 (H-09) | — | 20 |
 | P4 | 16 | 1 (H-10) | — | 10 |
-| Total | 237 | 11 | 8 | 33 |
+| Total | 238 | 11 | 8 | 33 |
 
 P1 Red check, 2026-11-02, against the skeleton (stubs throw `new Error("not implemented")`):
 - `npx vitest run`: 92 tests in 7 files. 73 fail, each with `Error: not implemented`, and none for another reason. 11 pass: the 9 helper self-tests, plus P1-BRD-01 and P1-BRD-07, which check `BOARD`; the skeleton already implements it as a frozen constant. The 8 P1-FIX cases are skipped while the manifest is empty.
 - `npx tsc --noEmit` and `npx eslint tests`: clean.
 - All 305 catalogue scenes render without error, in about 6.5 s.
 
+P2 runs in two batches: P2a is `tests/ar/pose.test.ts` with the 45 cases of this plan §4.1–§4.4 (44 at first, then P2-PNP-16 for OQ-69), and P2b is the other P2 files of this plan §1.1 with the remaining 61 cases.
+
+P2a Red check, 2026-11-02, against the skeleton of `src/ar/pose.ts` (every function throws `new Error("not implemented")`):
+- `npx vitest run tests/ar/pose.test.ts`: 44 tests, all failing with `Error: not implemented` thrown by the stubs (`intrinsicsFromFov` 4, `solvePlanarPnP` 14, `estimateFocal` 10, `viewMatrix` 6, `projectionMatrix` 7, `cameraPosition` 3), none for another reason. `npx vitest run`: 136 tests in 8 files; P1 unchanged at 84 passed and 8 skipped.
+- `npx tsc --noEmit` and `npx eslint tests`: clean.
+- The seeds were fixed before the implementation. A throwaway offline reference (Levenberg–Marquardt to convergence; the closed-form focal length from the normalised DLT) on exactly these trials gives: P2-PNP-03…05 worst rotation error 3 · 10⁻¹⁵ rad; P2-PNP-09 worst rotation error 0.27° for tilt 35–60° (bound 0.5°) and 1.24° for tilt 0–35° (bound 3°), worst translation error 0.19 % (bound 1 %); P2-PNP-10 margins of at least 2.4 · 10⁻³ px to the true pose and 7.4 · 10⁻⁵ px to the homography-only pose; P2-PNP-11 smallest rise 6.6 · 10⁻⁷ relative, for a rotation about an in-plane axis at near-frontal tilt (a solver must converge to within about 5 · 10⁻⁵ rad along that direction; two LM iterations from the homography pose suffice); P2-FOC-02 worst error 1.3 · 10⁻¹⁴ (bound 1 %); P2-FOC-03 worst 1.7 % (bound 10 %). The null/value split of P2-FOC-04 and P2-FOC-06 (with P2-FOC-02 on the value side) is separated by a scale-invariant two-stage rule: return a value only when the perspective ratio q = ‖(h31, h32)‖ · ρ_obj · W / (|w_c| · ρ_img) is at least 0.25 (w_c the homogeneous weight at the object centroid, ρ the RMS radii of the object and image points; q ≈ 2 sin(tilt) · tan(hfov / 2)) and the tilt implied by the estimated focal length is at least 17.5°. On the null side every trial has q ≤ 0.102 or an implied tilt ≤ 10.4°; on the value side q ≥ 0.364 and the implied tilt ≥ 24.4°. On 14,700 further trials (hfov 40–100°, tilt 0°, 5°, 9.5° and 25°, exact and noisy, inside OQ-24) this rule never breaks the contract, while q alone breaks it 1,209 times (it depends on hfov) and the implied tilt alone 15 times (an overestimated focal length near fronto-parallel). The reference passes all 44 tests with the two-stage rule; with either single rule it fails P2-FOC-04 only.
+
+P2a addendum for OQ-69 and OQ-70, 2026-11-02, against the implemented `src/ar/pose.ts`:
+- `npx vitest run tests/ar/pose.test.ts`: 45 tests; 44 pass, the new P2-PNP-16 included, and P2-PM-06 fails with `AssertionError: K with fx 0: expected a RangeError, but nothing was thrown`. None of its nine K inputs throws yet (each leaves an entry of P at 0, negative, NaN or ±Infinity), so the case stays red until `projectionMatrix` validates K (OQ-70).
+- P2-PNP-16 discriminates: a scratch copy of `pose.ts` without its t_z > 0 check returns, for the three boards, poses with t_z −1.000, −2.642 and −2.362 (rms ≤ 1.3 · 10⁻¹³) and so fails P2-PNP-16, the only one of the 45 cases that catches the change.
+- `npx vitest run`: 137 tests in 8 files, 128 passed, 1 failed (P2-PM-06) and 8 skipped. `npx tsc --noEmit` and `npx eslint tests`: clean.
+
 ## 10. Resolved questions
 
-Resolved on 2026-11-02. "A" and "B" refer to the options proposed in the first draft of this plan; the design's §14 lists the same resolutions.
+Resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in their review, all resolved the same day. "A" and "B" refer to the options proposed in the first draft of this plan (for OQ-61–OQ-70, in the P2a review); the design's §14 lists the same resolutions.
 
 ### 10.1 Evidence behind OQ-18, OQ-23 and OQ-27
 
@@ -791,3 +808,13 @@ Passing milliseconds where seconds are expected leaves 0.06 px of a 12 px step a
 | OQ-58 | §5.7 U2 | Unknown `?ar` values; `?ar=camera` without camera support | A | Unknown values are ignored; `?ar=camera` without support opens the overlay with the unsupported message | M3-02, M4-01 |
 | OQ-59 | §5.7 U10, U12 | Board view without camera support; wake lock release | A | "Use this device's camera" hidden without camera support; the lock is released on leaving the board view or closing | M4-04, M4-06 |
 | OQ-60 | §10, §12 | Worker bundling check in P2 | A | A temporary, uncommitted reference in P2 | M2-01 |
+| OQ-61 | §5.3 degenerate | Image points without four in general position | A | Degenerate, so null | P2-PNP-12 |
+| OQ-62 | §5.3 `estimateFocal` | Envelope of the null and value guarantees | A | True hfov 40–100°; tilt < 10° gives null with exact data at any board size, and with σ ≤ 0.3 px when the board spans ≥ 40 % of the width; trials draw the hfov from 40–100° | P2-FOC-04…07, P2-FOC-10 |
+| OQ-63 | §5.3 `estimateFocal` | Scale invariance with noise | A | ≤ 1e−9 relative for exact and noisy data | P2-FOC-10 |
+| OQ-64 | §5.3 `projectionMatrix` | far = Infinity | A | `RangeError`: near and far must be finite | P2-PM-06 |
+| OQ-65 | §5.3 accuracy envelopes | How the board's share of the image width is measured | A | At the outer edge of the 10 × 7 squares | P2-PNP-09…11, P2-FOC-03…06 |
+| OQ-66 | §5.3 minimisation | How P2-PNP-11 perturbs the pose | A | R ← Rot(±10⁻⁴ rad about a camera axis through the board origin) · R with t fixed; one component of t at a time | P2-PNP-11 |
+| OQ-67 | §5.3 degenerate, OQ-21 | Construction of the behind-the-camera case | A | A board straddling the camera's z = 0 plane gives null; the point reflection −P projects like P | P2-PNP-13 |
+| OQ-68 | §4 inputs | Inputs added beyond the first draft | A | Kept: hfov −Infinity, height 360.5, the P2-FOC-05 trial counts, the P2-FOC-07 corner directions with a 20 % board, a noisy P2-PNP-14 input | P2-INT-03, P2-INT-04, P2-FOC-05, P2-FOC-07, P2-PNP-14 |
+| OQ-69 | §5.3 postconditions | Board points in front of the camera while the board origin is behind it | A | null, so that t_z > 0 holds; only object points far from their origin can cause this | P2-PNP-16 |
+| OQ-70 | §5.3 `projectionMatrix` | Validation of K | A | As in `solvePlanarPnP`: a non-finite fx, fy, cx or cy, or fx or fy ≤ 0, throws `RangeError` | P2-PM-06 |

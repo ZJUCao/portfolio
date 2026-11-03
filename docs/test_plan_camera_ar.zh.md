@@ -1,8 +1,8 @@
 # 测试计划：标定板上的摄像头 AR
 
-状态：**已于 2026-11-02 确认**；P1 测试已写好，对骨架代码全部为红（本计划 §9）· 设计文档：`docs/design_camera_ar.md`（已定细节见其 §14）· 英文版：`docs/test_plan_camera_ar.md`（以英文版为准，两版逐节同步）
+状态：**已于 2026-11-02 确认**；P1 已转绿；P2a 测试已写好，先对骨架代码全部为红（本计划 §9），现已转绿，OQ-69–OQ-70 的补充用例也已通过 · 设计文档：`docs/design_camera_ar.md`（已定细节见其 §14）· 英文版：`docs/test_plan_camera_ar.md`（以英文版为准，两版逐节同步）
 
-本计划把设计文档的接口契约（§5，及 §6 的坐标约定、§9 的测试策略）按阶段（设计文档 §10）映射到测试用例。决策 D1–D14 均取方案 A。契约原先没有定义的 60 个问题都已定下（本计划 §10）：除 OQ-04、OQ-06、OQ-09、OQ-27、OQ-47 外均取方案 A。"§5.2" 这类编号指设计文档，"本计划 §x" 指本文档。
+本计划把设计文档的接口契约（§5，及 §6 的坐标约定、§9 的测试策略）按阶段（设计文档 §10）映射到测试用例。决策 D1–D14 均取方案 A。契约原先没有定义的 60 个问题都已定下（本计划 §10）：除 OQ-04、OQ-06、OQ-09、OQ-27、OQ-47 外均取方案 A。编写 P2a 测试时又提出了 OQ-61–OQ-68，评审时又提出了 OQ-69–OQ-70，均取方案 A。"§5.2" 这类编号指设计文档，"本计划 §x" 指本文档。
 
 因决议而删除的用例（编号不再复用）：P1-DET-11（OQ-09）、P2-PNP-06（OQ-19）、P3-TRK-41（OQ-47）、P3-COPY-01、P3-COPY-02 和 P4-COPY-01（OQ-04），以及 M3-20（OQ-03）。
 
@@ -32,7 +32,7 @@
 | `tests/ar/tracker.test.ts` | P3-TRK | P3 |
 | `tests/app/chessboard-pdf.test.ts` | P4-PDF | P4 |
 
-辅助代码放在 `tests/ar/helpers/`：`random.ts`、`boardModel.ts`、`linalg.ts`、`render.ts`、`scenes.ts`、`catalog.ts`（P1 的全部场景）、`metrics.ts`、`fixtures.ts`（读取照片），P3 起还有 `cameraFakes.ts`。PDF 解析器只给路由测试用，放在它旁边的 `tests/app/helpers/pdf.ts`。实拍照片和清单放 `tests/fixtures/board/`。
+辅助代码放在 `tests/ar/helpers/`：`random.ts`、`boardModel.ts`、`linalg.ts`、`render.ts`、`scenes.ts`、`catalog.ts`（P1 的全部场景）、`metrics.ts`、`fixtures.ts`（读取照片）、`poses.ts` 和 `poseCatalog.ts`（P2：位姿相关的数学和 P2a 的全部带种子输入），P3 起还有 `cameraFakes.ts`。PDF 解析器只给路由测试用，放在它旁边的 `tests/app/helpers/pdf.ts`。实拍照片和清单放 `tests/fixtures/board/`。
 
 模块 mock（`vi.mock`）只出现在 `pipeline.spy.test.ts`，而且只针对 §5.4 自己规定了的调用：带提示的检测调用、`estimateFocal` 和 `solvePlanarPnP`。其余一律通过公开接口测试。
 
@@ -110,7 +110,7 @@ D1–D14 均取方案 A。
 - `moveScene(scene, kind, direction, shift)`：平移、旋转、缩放或改变倾角，用二分使最大角点位移恰为 `shift` × 最短投影格边（OQ-15）；`shiftInSquares` 负责测量。
 - `catalog.ts` 把 P1 检测器测试用到的每个场景记为一项：标签、渲染参数、请求的点阵尺寸，以及对该测试所需条件的检查（标称；仅因预期原因而不标称；没有标定板；有角点在图外 ≥ 4 px；最近的角点落在给定区间；移动后场景的实测位移）。辅助工具自检 H-11 只凭几何信息运行全部检查，不调用检测器。`renderItem` 在每个测试文件里对每项只渲染一次。
 
-### 2.5 度量与断言（`metrics.ts`、`linalg.ts`）
+### 2.5 度量、断言与位姿辅助代码（`metrics.ts`、`linalg.ts`、`poses.ts`、`poseCatalog.ts`）
 
 - `cornerErrors(result, truth)`：逐点距离、RMS 和最大值。
 - `expectLayout`、`expectAccurate`、`expectIdentityCorrect` 及其 `expectNullOr…` 形式；`expectAccurate` 还会运行 `expectOrderProperties`（O2 由角点 0 处的叉积判断，O3 由图像判断）。
@@ -119,6 +119,8 @@ D1–D14 均取方案 A。
 - `rotationAngle(Ra, Rb)` = atan2(‖vee(M − Mᵀ)‖ / 2, (tr M − 1) / 2)，M = Ra · Rbᵀ，在 1e−6 rad 附近仍然准确（供 P2 使用）。
 - `expectRangeError(call)`：遇到 `RangeError` 即通过，其他异常原样抛出，因此在 Red 运行中参数校验用例失败时报的就是桩函数自己的 "not implemented"。
 - `bytesOf(view)` 复制类型化数组背后的字节，用于检查是否被修改；`toFloat32` 用来构造提示。
+- `poses.ts`（P2）：带种子的标定板摆放（`samplePose` 在给定范围内采样，`placeRotated` 按给定旋转摆放）、不检查 z 符号的精确针孔投影、高斯像素噪声、§5.3 定义的重投影 RMS、P2-PNP-10 用来比较的仅由单应得到的位姿（K⁻¹ 乘以 `fitHomography` 的结果，λ 取两列范数的均值并使 t_z > 0，R 由极分解取最近的旋转）、§6 的矩阵 B 和 F、列主序 4 × 4 乘法与行列式，以及从布局（而不是 §5.3 的公式）推导出的 cover 适配下像素到 NDC 的映射。
+- `poseCatalog.ts`（P2）：P2a 的全部带种子输入，每次试验一个随机流（对试验标签取 `seedFor`），因此同组测试共用试验，离线检查也能重放。
 
 ### 2.6 `startCameraAR` 的替身（`cameraFakes.ts`，P3）
 
@@ -331,15 +333,18 @@ D1–D14 均取方案 A。
 | P2-PNP-08 | `rms` 的定义 | 测试自己计算 sqrt((1/N) · Σ ‖imageXY_k − K(R [X Y 0]ᵀ + t)‖²)，对 N 个点取平均 | 与 `rms` 相对误差 ≤ 1e−9 |
 | P2-PNP-09 | 加噪精度（OQ-18） | 54 个角点加 σ 0.3 px 噪声，真实 K，标定板 ≥ 图宽 1/3；倾角 35–60° 和 0–35° 各 20 次带种子的试验 | 倾角 35–60°：旋转 ≤ 0.5°；倾角 0–35°：旋转 ≤ 3°；两者平移都 ≤ ‖t_true‖ 的 1 % |
 | P2-PNP-10 | 最小化像素误差 | 那 40 次加噪试验 | `rms` ≤ 真实位姿的 rms + 1e−9，并且 ≤ 辅助工具只用单应得到的位姿的 rms + 1e−9 |
-| P2-PNP-11 | 局部极小 | 旋转绕各轴扰动 ±1e−4 rad，t 各分量扰动 ±1e−4 · ‖t‖ | `rms` 下降不超过相对 1e−9 |
-| P2-PNP-12 | 退化 → null（OQ-20） | 所有物点共线；所有像点共线；所有像点重合；2 个点各重复 4 次；4 个点中有 3 点共线 | null |
-| P2-PNP-13 | 标定板在相机后方（OQ-21） | 像点取有效投影的点反射 −P | null |
+| P2-PNP-11 | 局部极小（OQ-66） | 旋转绕各轴扰动 ±1e−4 rad，t 各分量扰动 ±1e−4 · ‖t‖ | `rms` 下降不超过相对 1e−9 |
+| P2-PNP-12 | 退化 → null（OQ-20、OQ-61） | 所有物点共线；所有像点共线；所有像点重合；2 个点各重复 4 次；4 个点中有 3 点共线 | null |
+| P2-PNP-13 | 标定板在相机后方（OQ-21、OQ-67） | 一块刚性标定板，其平面在两行或两列角点之间穿过相机的 z = 0 平面，因此一部分角点 Z > 0、另一部分 Z < 0（abs(Z) ≥ 0.1，像素坐标都是有限值），用针孔公式投影。三种情形：第 0–1 行在后方、板原点在前方；只有第 5 行在后方、原点在前方；第 3–8 列在后方、原点在后方。没有哪块完全位于相机前方的标定板能重现这些像素 | null |
 | P2-PNP-14 | §8 纯函数 | 相同输入调用两次；事先复制输入的字节 | R、t、rms 逐位相同；输入不变 |
 | P2-PNP-15 | 尺度不变 | 物点 × 7、t_true × 7，精确数据 | R 相同；t 为 7 倍，相对误差 ≤ 1e−6 |
+| P2-PNP-16 | 标定板原点在相机后方（OQ-69） | 54 个角点沿 X 平移 6、沿 Y 平移 8、沿对角线平移 7，使最近的角点离其坐标原点也有至少 5 个板单位；分别以 30°、40°、50° 的倾角观察，每个角点都在相机前方（z ≥ 1.5），而该原点在相机后方（t_z 为 −1.0、−2.6、−2.4）；精确投影 | null；同样的像素配上角点自身以中心为原点的坐标，得到真实位姿，误差在 P2-PNP-03 的界限内 |
+
+说明：P2-PNP-09…11 共用那 40 次试验，设置同本计划 §10.1：640×360，hfov 60°，标定板居中且方格恰好占图宽 1/3，倾斜轴和面内旋转随机。P2-PNP-11 把 R 绕经过板原点的各个相机坐标轴旋转（R ← Rot(±10⁻⁴) · R，t 不变），t 则一次只动一个分量。P2-PNP-13 替换了最初的构造（有效投影的点反射 −P）：透视除法会消去符号（u = fx · (−X)/(−Z) + cx），所以那些像素就是该有效投影自己的像素，相机前方的标定板就能解释它们。
 
 ### 4.3 `estimateFocal`（§5.3）
 
-本节中倾角指标定板法线与光轴的夹角（OQ-23）。
+本节中倾角指标定板法线与光轴的夹角（OQ-23）。加噪试验取 OQ-24 范围的边界：640×360，标定板居中且方格恰好占图宽 40 %，σ 0.3 px。P2-FOC-04…06 的精确数据试验中，标定板占图宽 40 %–90 %，中心在主点周围、图像尺寸的 ±15 % 以内。P2-FOC-04…06 和 P2-FOC-10 的真实 hfov 在 40–100°（D1 的限幅范围，OQ-62）内抽取；P2-FOC-03 保持 hfov 60°，即本计划 §10.1 的设置。
 
 | 编号 | 条款 | 准备 / 输入 | 预期 |
 | :--- | :--- | :--- | :--- |
@@ -367,7 +372,7 @@ D1–D14 均取方案 A。
 | P2-PM-03 | cover 的边界 | 宽视口 1920×800（s = W/w）；高视口 390×844（s = H/h） | 宽：u = −0.5 → x_ndc = −1，u = w − 0.5 → +1。高：v = −0.5 → y_ndc = +1，v = h − 0.5 → −1 |
 | P2-PM-04 | 深度 | Z = near、Z = far 及其间的点 | z_ndc 分别为 −1 和 +1，误差 ≤ 1e−9；随 Z 递增 |
 | P2-PM-05 | 能被 WebGL 使用（OQ-26） | Z > 0 的点 | 裁剪空间 w = k · Z 且 k > 0；det P ≠ 0 |
-| P2-PM-06 | `RangeError`（OQ-22） | 图像或视口宽高为 0、−1、NaN、±Infinity；near 为 0、−1；near = far；near > far；near 或 far 为 NaN | `RangeError` |
+| P2-PM-06 | `RangeError`（OQ-22、OQ-64、OQ-70） | 图像或视口宽高为 0、−1、NaN、±Infinity；near 为 0、−1；near = far；near > far；near 或 far 为 NaN；far = Infinity；K 的 fx 为 0 或 −1、fy 为 0 或 −1、fx 为 NaN、fy 为 Infinity、cx 为 NaN 或 Infinity、cy 为 −Infinity，其余参数合法 | `RangeError` |
 | P2-PM-07 | 形状，在 three.js 中使用 | 任意合法输入 | `Float64Array(16)`，每次新建；经 `Matrix4.fromArray` 和 `Vector3.applyMatrix4`（会除以 w）得到同样的 NDC |
 | P2-CP-01 | `cameraPosition` 公式 | 20 个随机位姿 | B⁻¹ · (−Rᵀ t)，误差 ≤ 1e−12；每次返回新的 `Float64Array(3)` |
 | P2-CP-02 | 与 `viewMatrix` 一致 | 同上 | V · [c, 1] = (0, 0, 0, 1)，误差 ≤ 1e−9 |
@@ -669,19 +674,31 @@ D1–D14 均取方案 A。
 | 阶段 | 自动化契约用例 | 辅助工具自检 | 实拍照片用例（D12） | 手动 |
 | :--- | ---: | ---: | ---: | ---: |
 | P1 | 75 | 9（H-01…H-08、H-11） | 8 | 1 |
-| P2 | 105 | 0 | — | 2 |
+| P2 | 106 | 0 | — | 2 |
 | P3 | 41 | 1（H-09） | — | 20 |
 | P4 | 16 | 1（H-10） | — | 10 |
-| 合计 | 237 | 11 | 8 | 33 |
+| 合计 | 238 | 11 | 8 | 33 |
 
 P1 的 Red 检查，2026-11-02，针对骨架代码（桩函数抛出 `new Error("not implemented")`）：
 - `npx vitest run`：7 个文件共 92 个测试。73 个失败，失败原因都是 `Error: not implemented`，没有其他原因。11 个通过：9 个辅助工具自检，以及检查 `BOARD` 的 P1-BRD-01 和 P1-BRD-07（骨架已把它实现为冻结的常量）。8 个 P1-FIX 用例因清单为空而跳过。
 - `npx tsc --noEmit` 和 `npx eslint tests`：无报错。
 - 目录中全部 305 个场景都能渲染、不报错，约 6.5 s。
 
+P2 分两批进行：P2a 是 `tests/ar/pose.test.ts`，含本计划 §4.1–§4.4 的 45 个用例（最初 44 个，后为 OQ-69 增加 P2-PNP-16）；P2b 是本计划 §1.1 中其余的 P2 文件，含剩下的 61 个用例。
+
+P2a 的 Red 检查，2026-11-02，针对 `src/ar/pose.ts` 的骨架代码（每个函数都抛出 `new Error("not implemented")`）：
+- `npx vitest run tests/ar/pose.test.ts`：44 个测试全部失败，失败原因都是桩函数抛出的 `Error: not implemented`（`intrinsicsFromFov` 4 个、`solvePlanarPnP` 14 个、`estimateFocal` 10 个、`viewMatrix` 6 个、`projectionMatrix` 7 个、`cameraPosition` 3 个），没有其他原因。`npx vitest run`：8 个文件共 136 个测试；P1 不变，84 个通过、8 个跳过。
+- `npx tsc --noEmit` 和 `npx eslint tests`：无报错。
+- 种子在实现之前就已固定。用一次性的离线参考实现（Levenberg–Marquardt 迭代到收敛；由归一化 DLT 求焦距的闭式解）在完全相同的试验上得到：P2-PNP-03…05 旋转误差最大 3 · 10⁻¹⁵ rad；P2-PNP-09 旋转误差最大 0.27°（倾角 35–60°，界限 0.5°）和 1.24°（倾角 0–35°，界限 3°），平移误差最大 0.19 %（界限 1 %）；P2-PNP-10 与真实位姿的余量至少 2.4 · 10⁻³ px，与仅由单应得到的位姿的余量至少 7.4 · 10⁻⁵ px；P2-PNP-11 的最小相对上升为 6.6 · 10⁻⁷，出现在接近正对时绕板面内轴的旋转（求解器在这个方向上要收敛到约 5 · 10⁻⁵ rad 以内；从单应位姿出发迭代两次 LM 就够）；P2-FOC-02 最大误差 1.3 · 10⁻¹⁴（界限 1 %）；P2-FOC-03 最大 1.7 %（界限 10 %）。P2-FOC-04 与 P2-FOC-06（P2-FOC-02 也属于有值一侧）的 null/有值划分，可以用一条尺度不变的两级规则分开：只有当透视比 q = ‖(h31, h32)‖ · ρ_obj · W / (|w_c| · ρ_img) 至少为 0.25（w_c 为物点质心处的齐次权重，ρ 为物点和像点的 RMS 半径；q ≈ 2 sin(倾角) · tan(hfov / 2)），并且由估计焦距推出的倾角至少为 17.5° 时才返回值。null 一侧的每次试验都满足 q ≤ 0.102 或推出的倾角 ≤ 10.4°；有值一侧 q ≥ 0.364 且推出的倾角 ≥ 24.4°。在另外 14,700 次试验（hfov 40–100°，倾角 0°、5°、9.5° 和 25°，精确和加噪，都在 OQ-24 范围内）中，这条规则从未违反契约；只用 q 违反 1,209 次（它依赖 hfov），只用推出的倾角违反 15 次（接近正对时焦距被高估）。参考实现用这条两级规则能通过全部 44 个测试；只用其中任一条单一规则时，只有 P2-FOC-04 失败。
+
+P2a 针对 OQ-69 和 OQ-70 的补充，2026-11-02，针对已实现的 `src/ar/pose.ts`：
+- `npx vitest run tests/ar/pose.test.ts`：45 个测试，44 个通过（含新增的 P2-PNP-16），P2-PM-06 失败，报 `AssertionError: K with fx 0: expected a RangeError, but nothing was thrown`。它的 9 个 K 输入目前都不抛错（每个都让 P 的某个元素成为 0、负数、NaN 或 ±Infinity），所以在 `projectionMatrix` 校验 K（OQ-70）之前，这个用例保持为红。
+- P2-PNP-16 有区分力：把 `pose.ts` 复制到 scratch 并去掉其中的 t_z > 0 检查后，三块标定板分别得到 t_z 为 −1.000、−2.642、−2.362 的位姿（rms ≤ 1.3 · 10⁻¹³），P2-PNP-16 因此失败；45 个用例中只有它能发现这个改动。
+- `npx vitest run`：8 个文件共 137 个测试，128 个通过、1 个失败（P2-PM-06）、8 个跳过。`npx tsc --noEmit` 和 `npx eslint tests`：无报错。
+
 ## 10. 已定问题
 
-2026-11-02 定下。"A""B"指本计划初稿中提出的方案；设计文档 §14 列出了相同的决议。
+2026-11-02 定下；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是其评审时提出的，均于同日定下。"A""B"指本计划初稿中提出的方案（OQ-61–OQ-70 指 P2a 评审时提出的方案）；设计文档 §14 列出了相同的决议。
 
 ### 10.1 OQ-18、OQ-23、OQ-27 的依据
 
@@ -791,3 +808,13 @@ P1 的 Red 检查，2026-11-02，针对骨架代码（桩函数抛出 `new Error
 | OQ-58 | §5.7 U2 | 未知的 `?ar` 值；不支持摄像头时的 `?ar=camera` | A | 未知值忽略；不支持时 `?ar=camera` 打开浮层并显示不支持的提示 | M3-02、M4-01 |
 | OQ-59 | §5.7 U10、U12 | 不支持摄像头时的标定板视图；屏幕常亮锁的释放 | A | 不支持摄像头时隐藏"用这台设备的摄像头"；离开标定板视图或关闭浮层时释放 | M4-04、M4-06 |
 | OQ-60 | §10、§12 | P2 的 worker 打包检查 | A | P2 中加一处临时、不提交的引用 | M2-01 |
+| OQ-61 | §5.3 退化 | 像点中找不到 4 个处于一般位置的点 | A | 视为退化，返回 null | P2-PNP-12 |
+| OQ-62 | §5.3 `estimateFocal` | 返回 null 和返回数值这两类保证的适用范围 | A | 真实 hfov 40–100°；倾角 < 10° 时，精确数据无论标定板多大都返回 null，σ ≤ 0.3 px 时标定板 ≥ 图宽 40 % 才保证返回 null；试验的 hfov 在 40–100° 内抽取 | P2-FOC-04…07、P2-FOC-10 |
+| OQ-63 | §5.3 `estimateFocal` | 带噪声时的尺度不变性 | A | 精确数据和带噪声数据都在相对 1e−9 以内 | P2-FOC-10 |
+| OQ-64 | §5.3 `projectionMatrix` | far = Infinity | A | 抛出 `RangeError`：near 和 far 必须是有限数 | P2-PM-06 |
+| OQ-65 | §5.3 精度条件 | 标定板占图像宽度的比例怎么量 | A | 按 10 × 7 个格子的外边缘量 | P2-PNP-09…11、P2-FOC-03…06 |
+| OQ-66 | §5.3 最小化 | P2-PNP-11 如何扰动位姿 | A | R ← Rot（绕经过板原点的某个相机坐标轴转 ±10⁻⁴ rad）· R，t 不变；t 每次只动一个分量 | P2-PNP-11 |
+| OQ-67 | §5.3 退化、OQ-21 | 相机后方情形的构造 | A | 跨过相机 z = 0 平面的标定板返回 null；点反射 −P 的投影与 P 相同 | P2-PNP-13 |
+| OQ-68 | §4 输入 | 初稿之外补充的输入 | A | 保留：hfov −Infinity、高度 360.5、P2-FOC-05 的试验数、P2-FOC-07 的四角方向和 20 % 板宽、P2-PNP-14 的一个加噪输入 | P2-INT-03、P2-INT-04、P2-FOC-05、P2-FOC-07、P2-PNP-14 |
+| OQ-69 | §5.3 后置条件 | 标定板上的点都在相机前方，而板原点在相机后方 | A | 返回 null，以保证 t_z > 0；只有离原点很远的物点才会出现这种情况 | P2-PNP-16 |
+| OQ-70 | §5.3 `projectionMatrix` | 是否校验 K | A | 与 `solvePlanarPnP` 一致：fx、fy、cx、cy 有非有限值，或 fx、fy ≤ 0 时抛出 `RangeError` | P2-PM-06 |
