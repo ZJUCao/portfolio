@@ -1,6 +1,6 @@
 # Design: Camera AR on a calibration board
 
-Status: **Confirmed 2026-11-02**, P1 and P2a done, P2b in progress · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
+Status: **Confirmed 2026-11-02**, P1 and P2 done, P3 next · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
 
 ## 1. Goal
 
@@ -227,7 +227,7 @@ export function handleWorkerMessage(
 1. When a frame's width or height differs from the previous frame's, all state is reset before the frame is processed.
 2. Converts to grey and runs `findChessboardCorners(gray, 9, 6, { previous })`, where `previous` is the previous frame's raw (unsmoothed) corners.
 3. Not found: `found` false, `corners` and `pose` null, the corner filter is reset, `intrinsics` is the focal tracker's current value.
-4. Found: with `autoFocal`, `estimateFocal(boardCorners(), raw, width, height)` is added to the focal tracker. K = { fx = fy = tracker.focal(width), cx = (width − 1) / 2, cy = (height − 1) / 2 }. Corners are smoothed when `smoothing` is on. `pose = solvePlanarPnP(boardCorners(), smoothed, K)`; when that returns `null` the frame counts as not found.
+4. Found: with `autoFocal`, `estimateFocal(boardCorners(), raw, width, height)` is added to the focal tracker. K = { fx = fy = tracker.focal(width), cx = (width − 1) / 2, cy = (height − 1) / 2 }. Corners are smoothed when `smoothing` is on. The smoothing is `createCornerFilter()` with its default parameters, and the focal tracker is `createFocalTracker({ hfovDeg })` with the pipeline's `hfovDeg` and its other options at their defaults (OQ-75). `pose = solvePlanarPnP(boardCorners(), smoothed, K)`; when that returns `null` the frame counts as not found.
 5. The pipeline never keeps a reference to arrays it returns, so callers may transfer them. The same frame sequence always gives the same outputs, apart from `ms`.
 6. `reset()` clears tracking, smoothing and focal state.
 
@@ -436,12 +436,12 @@ Seams for tests: `startCameraAR` takes its dependencies (media devices, worker f
 | Phase | Source files | Changed lines (est.) | Site after the phase |
 | :--- | :--- | :--- | :--- |
 | P1 Detector | `src/ar/board.ts`, `src/ar/chessboard.ts` | ~430 (762 as built) | unchanged (new modules unused) |
-| P2a Pose (§5.3) | `src/ar/pose.ts` | ~500 | unchanged |
-| P2b Worker pipeline (§5.4) | `src/ar/pipeline.ts`, `src/ar/tracker.worker.ts` | ~300 | unchanged |
+| P2a Pose (§5.3) | `src/ar/pose.ts` | ~500 (597 as built) | unchanged |
+| P2b Worker pipeline (§5.4) | `src/ar/pipeline.ts`, `src/ar/tracker.worker.ts` | ~300 (332 as built) | unchanged |
 | P3 Camera AR overlay | `src/ar/tracker.ts`, `src/components/CameraAR.tsx`, `src/components/heroScene.ts`, `src/components/HeroViewport.tsx`, `src/data/profile.ts` | ~490 | camera AR works with a printed board |
 | P4 Board view, QR, PDF | `src/components/CameraAR.tsx`, `src/components/HeroViewport.tsx`, `src/app/chessboard.pdf/route.ts`, `src/data/profile.ts` | ~180 | the full feature |
 
-About 2,200 changed source lines in 11 files (P1 as built, the rest estimated), tests, docs and build files excluded. P1 came in at 762 lines against an estimate of 430, so P2 was re-estimated at about 800 lines before it started and split into P2a and P2b (confirmed 2026-11-02). Each phase goes through skeleton → tests (Red) → implementation (Green) → verification, and stops for review before the next starts.
+About 2,350 changed source lines in 11 files (P1 and P2 as built, P3 and P4 estimated), tests, docs and build files excluded. P1 came in at 762 lines against an estimate of 430, so P2 was re-estimated at about 800 lines before it started and split into P2a and P2b (confirmed 2026-11-02); it came in at 929. Each phase goes through skeleton → tests (Red) → implementation (Green) → verification, and stops for review before the next starts.
 
 ## 11. Assumptions
 
@@ -452,7 +452,7 @@ About 2,200 changed source lines in 11 files (P1 as built, the rest estimated), 
 - URL parameter `ar` with the values `camera` and `board`.
 - "Desktop" means `matchMedia("(any-pointer: coarse)")` does not match.
 - The overlay sits above the navigation bar; scrolling is locked with `overflow: hidden` on `<html>`.
-- The worker is a module worker created with `new URL(..., import.meta.url)`. There is no in-thread fallback (OQ-47): P2 checks with `next build` and a temporary reference that it bundles (OQ-60), and if it doesn't, the user decides how to proceed.
+- The worker is a module worker created with `new URL(..., import.meta.url)`. There is no in-thread fallback (OQ-47): P2 checks with `next build` and a temporary reference that it bundles (OQ-60), and if it doesn't, the user decides how to proceed. Checked in P2b on 2026-11-03: Turbopack loads it through its own bootstrap script (`turbopack-worker-*.js`) as a classic worker, dropping the `type` option, with the pipeline, detector and pose in one 19.7 KB chunk (8 KB gzipped) and no three.js or React; in the browser pane the exported site's worker answered a blank 64 × 36 frame with a `result` (fx 55.43, the buffer returned). Turbopack also copies `tracker.worker.ts` itself into `static/media` as an unused file; left in `out`, that copy breaks the next build's type check, so `tsconfig.json` now excludes `out`.
 - Outside the overlay the hero HUD stays a simulation with its current copy.
 
 ## 12. Risks
@@ -462,7 +462,7 @@ About 2,200 changed source lines in 11 files (P1 as built, the rest estimated), 
 | A home-grown detector is less robust than OpenCV on real photos (blur, glare, screens) | Synthetic stress tests, real-photo fixtures (D12), tracking by refinement, and rejecting rather than guessing |
 | Phone performance | Worker, 640 px analysis frames, a tracking path of ≤ 5 ms, one frame in flight |
 | Unknown focal length | Estimated from the board with a clamp (D1), 60° until then |
-| Turbopack bundling of the worker | Checked with `next build` in P2 (OQ-60); no fallback, so a failure goes to the user (OQ-47) |
+| Turbopack bundling of the worker | Checked in P2b with `next build` and a temporary reference (OQ-60): it bundles without three.js and answers a frame in the browser (§11); no fallback, so a failure goes to the user (OQ-47) |
 | iOS quirks (playsinline, autoplay, rotation) | `muted` and `playsinline`; a frame size change resets the pipeline; manual test on an iPhone |
 | Moiré and glare when filming a monitor | The board view uses big squares and a white margin; manual test |
 
@@ -470,13 +470,13 @@ About 2,200 changed source lines in 11 files (P1 as built, the rest estimated), 
 
 - [x] P1 Detector: green on 2026-11-02 (84 passed, 8 photo cases skipped until fixtures exist); reviewed and committed as `b98e03c` on `claude/camera-ar`
 - [x] P2a Pose: green on 2026-11-02 (45 pose tests pass; full suite 129 passed, 8 skipped); reviewed and committed on `claude/camera-ar`
-- [ ] P2b Worker pipeline
+- [x] P2b Worker pipeline: green on 2026-11-03 (61 P2b tests pass; full suite 190 passed, 8 skipped); worker bundling checked (OQ-60); reviewed and committed on `claude/camera-ar`
 - [ ] P3 Camera AR overlay
 - [ ] P4 Board view, QR, PDF
 
 ## 14. Resolved details
 
-Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day. Each line is part of the contract.
+Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day; OQ-71–OQ-75 were raised while writing the P2b tests and resolved on 2026-11-03. Each line is part of the contract.
 
 | # | Area | Resolution |
 | :--- | :--- | :--- |
@@ -550,3 +550,8 @@ Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised wh
 | OQ-68 | Extra P2a inputs (test) | Kept: hfov −Infinity (P2-INT-03), height 360.5 (P2-INT-04), 5 exact and 5 noisy trials per tilt (P2-FOC-05), four image-corner directions with a 20 % board (P2-FOC-07), one noisy input (P2-PNP-14) |
 | OQ-69 | Board origin behind the camera | When the board points are in front of the camera but the board origin is not, `solvePlanarPnP` returns `null`, keeping t_z > 0 |
 | OQ-70 | `projectionMatrix` intrinsics | K is validated as in `solvePlanarPnP`: a non-finite value or fx, fy ≤ 0 throws `RangeError` |
+| OQ-71 | Pipeline focal test (P2-PIP-11) | The end-to-end run stays at a true hfov of 50°, inside the OQ-62 envelope; the clamp at the 40° bound is tested with scripted focal estimates (about 1194 px at width 640) in the spy tests |
+| OQ-72 | Corner filter independence (test) | P2-CF-06 also runs with coordinate a jittering by σ 0.3 px, since a static coordinate cannot reveal coupling |
+| OQ-73 | Architecture scan (test) | Modules not listed in §4 fail; board, chessboard, pose, pipeline and tracker.worker must exist, tracker.ts is checked from P3. The browser globals checked are window, document, navigator, self, postMessage, requestAnimationFrame and cancelAnimationFrame; self and postMessage are allowed only in tracker.worker, and tracker.ts may use the others anywhere until P3 limits them to its defaults |
+| OQ-74 | Extra P2b inputs (test) | Kept: the inputs added within the clauses of P2-CF, P2-FT, P2-PIP, P2-WRK, P2-WKE and P2-OPT, listed in the test plan |
+| OQ-75 | Pipeline components | The pipeline smooths with `createCornerFilter()` at its default parameters and tracks the focal length with `createFocalTracker({ hfovDeg })`, the pipeline's `hfovDeg` and the other options at their defaults |

@@ -1,6 +1,6 @@
 # 设计：基于标定板的摄像头 AR
 
-状态：**已确认（2026-11-02）**，P1 和 P2a 已完成，P2b 进行中 · 档位：Full · 分期：P1–P4，其中 P2 分两批（§10）
+状态：**已确认（2026-11-02）**，P1 和 P2 已完成，下一期 P3 · 档位：Full · 分期：P1–P4，其中 P2 分两批（§10）
 
 ## 1. 目标
 
@@ -227,7 +227,7 @@ export function handleWorkerMessage(
 1. 若某帧的宽或高与上一帧不同，先重置全部状态，再处理这一帧。
 2. 转为灰度并调用 `findChessboardCorners(gray, 9, 6, { previous })`，其中 `previous` 是上一帧的原始（未平滑）角点。
 3. 未找到：`found` 为 false，`corners` 和 `pose` 为 null，重置角点滤波器，`intrinsics` 取焦距追踪器的当前值。
-4. 找到：开启 `autoFocal` 时，把 `estimateFocal(boardCorners(), raw, width, height)` 加入焦距追踪器。K = { fx = fy = tracker.focal(width), cx = (width − 1) / 2, cy = (height − 1) / 2 }。开启 `smoothing` 时对角点做平滑。`pose = solvePlanarPnP(boardCorners(), smoothed, K)`；若它返回 `null`，该帧按未找到处理。
+4. 找到：开启 `autoFocal` 时，把 `estimateFocal(boardCorners(), raw, width, height)` 加入焦距追踪器。K = { fx = fy = tracker.focal(width), cx = (width − 1) / 2, cy = (height − 1) / 2 }。开启 `smoothing` 时对角点做平滑。平滑用默认参数的 `createCornerFilter()`；焦距追踪器是 `createFocalTracker({ hfovDeg })`，hfovDeg 取流水线的 `hfovDeg`，其他选项用默认值（OQ-75）。`pose = solvePlanarPnP(boardCorners(), smoothed, K)`；若它返回 `null`，该帧按未找到处理。
 5. 流水线不保留对其返回数组的引用，因此调用方可以转移（transfer）这些数组。相同的帧序列总是得到相同的输出（`ms` 除外）。
 6. `reset()` 清除追踪、平滑和焦距状态。
 
@@ -436,12 +436,12 @@ sequenceDiagram
 | 分期 | 源文件 | 改动行数（估） | 本期完成后的站点 |
 | :--- | :--- | :--- | :--- |
 | P1 检测器 | `src/ar/board.ts`、`src/ar/chessboard.ts` | ~430（实际 762） | 不变（新模块尚未使用） |
-| P2a 位姿（§5.3） | `src/ar/pose.ts` | ~500 | 不变 |
-| P2b worker 流水线（§5.4） | `src/ar/pipeline.ts`、`src/ar/tracker.worker.ts` | ~300 | 不变 |
+| P2a 位姿（§5.3） | `src/ar/pose.ts` | ~500（实际 597） | 不变 |
+| P2b worker 流水线（§5.4） | `src/ar/pipeline.ts`、`src/ar/tracker.worker.ts` | ~300（实际 332） | 不变 |
 | P3 摄像头 AR 全屏叠层 | `src/ar/tracker.ts`、`src/components/CameraAR.tsx`、`src/components/heroScene.ts`、`src/components/HeroViewport.tsx`、`src/data/profile.ts` | ~490 | 摄像头 AR 可配合打印的标定板使用 |
 | P4 标定板界面、二维码、PDF | `src/components/CameraAR.tsx`、`src/components/HeroViewport.tsx`、`src/app/chessboard.pdf/route.ts`、`src/data/profile.ts` | ~180 | 功能完整 |
 
-共约 2,200 行源代码改动，涉及 11 个文件（P1 为实际行数，其余为估算），不含测试、文档和构建文件。P1 估算 430 行，实际写了 762 行，因此 P2 开工前重新估算为约 800 行，并拆成 P2a 和 P2b 两批（2026-11-02 确认）。每期都按“骨架 → 测试（Red）→ 实现（Green）→ 验证”的流程进行，并在下一期开始前停下来评审。
+共约 2,350 行源代码改动，涉及 11 个文件（P1、P2 为实际行数，P3、P4 为估算），不含测试、文档和构建文件。P1 估算 430 行，实际写了 762 行，因此 P2 开工前重新估算为约 800 行，并拆成 P2a 和 P2b 两批（2026-11-02 确认），实际写了 929 行。每期都按“骨架 → 测试（Red）→ 实现（Green）→ 验证”的流程进行，并在下一期开始前停下来评审。
 
 ## 11. 假设
 
@@ -452,7 +452,7 @@ sequenceDiagram
 - URL 参数为 `ar`，取值为 `camera` 和 `board`。
 - “桌面端”指 `matchMedia("(any-pointer: coarse)")` 不匹配。
 - 全屏叠层位于导航栏之上；通过在 `<html>` 上设置 `overflow: hidden` 锁定滚动。
-- worker 是用 `new URL(..., import.meta.url)` 创建的 module worker。没有主线程内的回退方案（OQ-47）：P2 用 `next build` 加一个临时引用来检查它能否被打包（OQ-60）；如果不能，由用户决定如何处理。
+- worker 是用 `new URL(..., import.meta.url)` 创建的 module worker。没有主线程内的回退方案（OQ-47）：P2 用 `next build` 加一个临时引用来检查它能否被打包（OQ-60）；如果不能，由用户决定如何处理。已于 2026-11-03 在 P2b 中检查：Turbopack 通过自己的启动脚本（`turbopack-worker-*.js`）把它作为经典 worker 加载，去掉了 `type` 选项；流水线、检测器和位姿代码打进同一个 19.7 KB 的 chunk（gzip 后 8 KB），不含 three.js 和 React。在浏览器面板中，导出站点的 worker 对一帧 64 × 36 的空白帧回复了 `result`（fx 55.43，缓冲区也传了回来）。Turbopack 还会把 `tracker.worker.ts` 本身复制到 `static/media`，这份副本没有被引用；它若留在 `out` 里，会让下一次构建的类型检查失败，所以 `tsconfig.json` 现在排除了 `out`。
 - 在全屏叠层之外，hero HUD 仍是模拟效果，沿用现有文案。
 
 ## 12. 风险
@@ -462,7 +462,7 @@ sequenceDiagram
 | 自研检测器在真实照片上（模糊、反光、屏幕）不如 OpenCV 稳健 | 合成图像压力测试、真实照片样本（D12）、基于细化的追踪，以及宁可拒绝也不猜 |
 | 手机性能 | Worker、640 px 分析帧、≤ 5 ms 的追踪路径、一帧在途 |
 | 焦距未知 | 根据标定板估计并限定范围（D1），在此之前用 60° |
-| Turbopack 对 worker 的打包 | 在 P2 中用 `next build` 检查（OQ-60）；没有回退方案，失败时交由用户决定（OQ-47） |
+| Turbopack 对 worker 的打包 | 已在 P2b 中用 `next build` 加临时引用检查（OQ-60）：打包结果不含 three.js，在浏览器中能正常回复帧（§11）；没有回退方案，失败时交由用户决定（OQ-47） |
 | iOS 的特殊行为（playsinline、autoplay、旋转） | `muted` 和 `playsinline`；帧尺寸变化时重置流水线；在 iPhone 上手动测试 |
 | 拍摄显示器时的摩尔纹和反光 | 标定板界面使用大格子和白色边距；手动测试 |
 
@@ -470,13 +470,13 @@ sequenceDiagram
 
 - [x] P1 检测器：2026-11-02 测试全绿（84 个通过，8 个照片用例在有照片前跳过），已审阅并提交为 `claude/camera-ar` 分支上的 `b98e03c`
 - [x] P2a 位姿：2026-11-02 测试全绿（45 个位姿测试全部通过；全套 129 个通过、8 个跳过），已审阅并提交到 `claude/camera-ar` 分支
-- [ ] P2b worker 流水线
+- [x] P2b worker 流水线：2026-11-03 测试全绿（61 个 P2b 测试全部通过；全套 190 个通过、8 个跳过），已检查 worker 打包（OQ-60），已审阅并提交到 `claude/camera-ar` 分支
 - [ ] P3 摄像头 AR 全屏叠层
 - [ ] P4 标定板界面、二维码、PDF
 
 ## 14. 已定细节
 
-由测试计划提出，已于 2026-11-02 定案；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是 P2a 评审时提出的，都在同日定案。每一行都属于契约。
+由测试计划提出，已于 2026-11-02 定案；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是 P2a 评审时提出的，都在同日定案；OQ-71–OQ-75 是编写 P2b 测试时提出的，于 2026-11-03 定案。每一行都属于契约。
 
 | # | 方面 | 结论 |
 | :--- | :--- | :--- |
@@ -550,3 +550,8 @@ sequenceDiagram
 | OQ-68 | P2a 额外输入（测试） | 保留：hfov −Infinity（P2-INT-03）、高度 360.5（P2-INT-04）、每个倾角 5 个精确加 5 个加噪试验（P2-FOC-05）、图像四个角的方向且板宽 20 %（P2-FOC-07）、一个加噪输入（P2-PNP-14） |
 | OQ-69 | 板坐标原点在相机后方 | 标定板上的点都在相机前方、但板坐标原点不在时，`solvePlanarPnP` 返回 `null`，以保证 t_z > 0 |
 | OQ-70 | `projectionMatrix` 的内参 | 和 `solvePlanarPnP` 一样校验 K：含非有限值或 fx、fy ≤ 0 时抛出 `RangeError` |
+| OQ-71 | 流水线的焦距测试（P2-PIP-11） | 端到端那一段保持真实 hfov 50°，在 OQ-62 的范围内；40° 上限处的截断改在 mock 测试里检查，用脚本给出焦距估计值（宽 640 时约 1194 px） |
+| OQ-72 | 角点滤波器各坐标独立（测试） | P2-CF-06 另加一组让坐标 a 以 σ 0.3 px 抖动的数据，因为静止的坐标测不出坐标之间的串扰 |
+| OQ-73 | 架构扫描（测试） | §4 没列出的模块判为失败；board、chessboard、pose、pipeline 和 tracker.worker 必须存在，tracker.ts 从 P3 起检查。检查的浏览器全局对象是 window、document、navigator、self、postMessage、requestAnimationFrame 和 cancelAnimationFrame；self 和 postMessage 只允许出现在 tracker.worker 中，tracker.ts 在 P3 把它们限定到默认依赖之前，可以在任何位置使用其他几个 |
+| OQ-74 | P2b 额外输入（测试） | 保留：在 P2-CF、P2-FT、P2-PIP、P2-WRK、P2-WKE 和 P2-OPT 各条款范围内补充的输入，清单见测试计划 |
+| OQ-75 | 流水线的组成 | 流水线用默认参数的 `createCornerFilter()` 做平滑，用 `createFocalTracker({ hfovDeg })` 追踪焦距：hfovDeg 取流水线的 `hfovDeg`，其他选项用默认值 |

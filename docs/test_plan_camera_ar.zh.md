@@ -1,8 +1,8 @@
 # 测试计划：标定板上的摄像头 AR
 
-状态：**已于 2026-11-02 确认**；P1 已转绿；P2a 测试已写好，先对骨架代码全部为红（本计划 §9），现已转绿，OQ-69–OQ-70 的补充用例也已通过 · 设计文档：`docs/design_camera_ar.md`（已定细节见其 §14）· 英文版：`docs/test_plan_camera_ar.md`（以英文版为准，两版逐节同步）
+状态：**已于 2026-11-02 确认**；P1 已转绿；P2a 测试已写好，先对骨架代码全部为红（本计划 §9），现已转绿，OQ-69–OQ-70 的补充用例也已通过；P2b 测试已写好，先对骨架代码为红，其中 P2-ARCH-01、02 已经通过（本计划 §9），现已转绿 · 设计文档：`docs/design_camera_ar.md`（已定细节见其 §14）· 英文版：`docs/test_plan_camera_ar.md`（以英文版为准，两版逐节同步）
 
-本计划把设计文档的接口契约（§5，及 §6 的坐标约定、§9 的测试策略）按阶段（设计文档 §10）映射到测试用例。决策 D1–D14 均取方案 A。契约原先没有定义的 60 个问题都已定下（本计划 §10）：除 OQ-04、OQ-06、OQ-09、OQ-27、OQ-47 外均取方案 A。编写 P2a 测试时又提出了 OQ-61–OQ-68，评审时又提出了 OQ-69–OQ-70，均取方案 A。"§5.2" 这类编号指设计文档，"本计划 §x" 指本文档。
+本计划把设计文档的接口契约（§5，及 §6 的坐标约定、§9 的测试策略）按阶段（设计文档 §10）映射到测试用例。决策 D1–D14 均取方案 A。契约原先没有定义的 60 个问题都已定下（本计划 §10）：除 OQ-04、OQ-06、OQ-09、OQ-27、OQ-47 外均取方案 A。编写 P2a 测试时又提出了 OQ-61–OQ-68，评审时又提出了 OQ-69–OQ-70，编写 P2b 测试时提出了 OQ-71–OQ-75，均取方案 A。"§5.2" 这类编号指设计文档，"本计划 §x" 指本文档。
 
 因决议而删除的用例（编号不再复用）：P1-DET-11（OQ-09）、P2-PNP-06（OQ-19）、P3-TRK-41（OQ-47）、P3-COPY-01、P3-COPY-02 和 P4-COPY-01（OQ-04），以及 M3-20（OQ-03）。
 
@@ -32,7 +32,7 @@
 | `tests/ar/tracker.test.ts` | P3-TRK | P3 |
 | `tests/app/chessboard-pdf.test.ts` | P4-PDF | P4 |
 
-辅助代码放在 `tests/ar/helpers/`：`random.ts`、`boardModel.ts`、`linalg.ts`、`render.ts`、`scenes.ts`、`catalog.ts`（P1 的全部场景）、`metrics.ts`、`fixtures.ts`（读取照片）、`poses.ts` 和 `poseCatalog.ts`（P2：位姿相关的数学和 P2a 的全部带种子输入），P3 起还有 `cameraFakes.ts`。PDF 解析器只给路由测试用，放在它旁边的 `tests/app/helpers/pdf.ts`。实拍照片和清单放 `tests/fixtures/board/`。
+辅助代码放在 `tests/ar/helpers/`：`random.ts`、`boardModel.ts`、`linalg.ts`、`render.ts`、`scenes.ts`、`catalog.ts`（P1 的全部场景）、`metrics.ts`、`fixtures.ts`（读取照片）、`poses.ts` 和 `poseCatalog.ts`（P2：位姿相关的数学和 P2a 的全部带种子输入）、`frames.ts`、`filterInputs.ts` 和 `sourceScan.ts`（P2b：流水线用的帧、角点滤波器的输入信号和导入扫描），P3 起还有 `cameraFakes.ts`。PDF 解析器只给路由测试用，放在它旁边的 `tests/app/helpers/pdf.ts`。实拍照片和清单放 `tests/fixtures/board/`。
 
 模块 mock（`vi.mock`）只出现在 `pipeline.spy.test.ts`，而且只针对 §5.4 自己规定了的调用：带提示的检测调用、`estimateFocal` 和 `solvePlanarPnP`。其余一律通过公开接口测试。
 
@@ -121,6 +121,7 @@ D1–D14 均取方案 A。
 - `bytesOf(view)` 复制类型化数组背后的字节，用于检查是否被修改；`toFloat32` 用来构造提示。
 - `poses.ts`（P2）：带种子的标定板摆放（`samplePose` 在给定范围内采样，`placeRotated` 按给定旋转摆放）、不检查 z 符号的精确针孔投影、高斯像素噪声、§5.3 定义的重投影 RMS、P2-PNP-10 用来比较的仅由单应得到的位姿（K⁻¹ 乘以 `fitHomography` 的结果，λ 取两列范数的均值并使 t_z > 0，R 由极分解取最近的旋转）、§6 的矩阵 B 和 F、列主序 4 × 4 乘法与行列式，以及从布局（而不是 §5.3 的公式）推导出的 cover 适配下像素到 NDC 的映射。
 - `poseCatalog.ts`（P2）：P2a 的全部带种子输入，每次试验一个随机流（对试验标签取 `seedFor`），因此同组测试共用试验，离线检查也能重放。
+- `frames.ts`（P2b）：由灰度渲染结果按 R = G = B 生成的 RGBA 帧、每一帧都必须满足标称条件的标定板序列、空白帧、独立写出的 §5.4 焦距跟踪规则（作参照），以及去掉 `ms` 便于精确比较的流水线输出视图。`filterInputs.ts`：§4.5 用到的带种子的静止、抖动、阶跃、随机和移动角点信号。`sourceScan.ts`：用 TypeScript 编译器解析出一个模块的导入和对浏览器全局对象的使用，注释和字符串不会干扰扫描。
 
 ### 2.6 `startCameraAR` 的替身（`cameraFakes.ts`，P3）
 
@@ -154,7 +155,7 @@ D1–D14 均取方案 A。
 - 种子在实现出现之前（Red 阶段）就写定，不为了让某次运行通过而更换；更换种子需要在本计划里注明。
 - 不存黄金图像或输出快照：真值都是解析计算的，不同 Node 版本之间最后一位的差异至多改变一次 8 位取整，有界的断言能吸收。确定性用例在同一进程内比较两次运行。
 - 只有 P1-PERF 用真实时钟，取中位数、先预热、界限放宽 3 倍（OQ-05）。其他用例都用手动时钟和手动调度器。
-- 每个用例自己创建流水线、滤波器、tracker 和替身；用到它们的用例结束后执行 `vi.restoreAllMocks()` 和 `vi.unstubAllGlobals()`。耗时的 P1 用例把超时设为 120 s。
+- 每个用例自己创建流水线、滤波器、tracker 和替身；用到它们的用例结束后执行 `vi.restoreAllMocks()` 和 `vi.unstubAllGlobals()`。在 Vitest 4 中，`vi.restoreAllMocks()` 只还原用 `vi.spyOn` 创建的 spy，既不清空也不重置 `vi.mock` 工厂里创建的 `vi.fn`，所以 `pipeline.spy.test.ts` 还会对它的三个包装函数调用 `mockReset()`，清空调用记录并让每个包装函数重新调用真实函数。耗时的 P1 用例把超时设为 120 s。
 
 ### 2.9 辅助工具自检
 
@@ -393,7 +394,7 @@ D1–D14 均取方案 A。
 | P2-CF-03 | 长度变化 | 108 → 10 → 108 个值 | 每次变化时返回副本；之后从新的起点开始平滑 |
 | P2-CF-04 | 时间没有后移 | 同一时间调用两次；时间倒退 | 返回副本，并从它重新开始 |
 | P2-CF-05 | 恒定输入 | 100 帧相同输入 | 每次输出都等于输入 |
-| P2-CF-06 | 各坐标独立 | 坐标 a 静止、坐标 b 以 300 px/s 移动，放在同一数组里滤波 | 与两个各管一个坐标的滤波器结果一致，误差 ≤ 1e−12 |
+| P2-CF-06 | 各坐标独立（OQ-72） | 坐标 a 静止、坐标 b 以 300 px/s 移动，放在同一数组里滤波；再让 a 以 σ 0.3 px 抖动做一遍，因为静止的坐标看不出坐标之间的耦合 | 与两个各管一个坐标的滤波器结果一致，误差 ≤ 1e−12 |
 | P2-CF-07 | One Euro 是一阶低通 | 500 帧随机输入 | 每次输出都介于上一次输出和当前输入之间；阶跃时不过冲 |
 | P2-CF-08 | 抖动（OQ-28） | 108 个静止坐标加 σ 0.3 px 带种子抖动，30 fps，300 帧 | 每个坐标第 11–300 帧输出的标准差 ≤ 其输入标准差的 0.5 倍 |
 | P2-CF-09 | ≥ 12 px 的阶跃（OQ-29） | 收敛后在 x 方向 +12 px、y 方向 −12 px、对角线方向 12 px 阶跃；无噪声 | 从新位置的第 6 个输出起，每个角点都在新位置 0.5 px 以内（欧氏距离） |
@@ -421,6 +422,8 @@ D1–D14 均取方案 A。
 
 除非另有说明，帧为 320×180（标称的 12 px 格子放得下），RGBA 由灰度渲染结果按 R = G = B 生成，间隔 1000/30 ms。"原始"角点指被 spy 的检测调用返回的角点。
 
+320×180 序列按真实 hfov 52° 渲染，标定板相对视线约倾斜 30°，最短格边 12.3 px，方格约占图宽 52 %，这样学到的焦距（328 px）与 60° 默认值（277 px）明显不同；180×320 序列用 hfov 56°。P2-PIP-11 把标定板放在 OQ-24 的范围内：方格占图宽 45 %，相对光轴倾斜 40–50°，中心靠近主点，因此在 hfov 50° 时每帧的估计都应有值（OQ-62）。比 40° 下限更窄的相机不在 OQ-62 假设的 40–100° 范围内，所以钳位改在 P2-PIP-10 中用这组帧的前 8 帧和脚本给出的估计值来测（OQ-71）。P2-PIP-18 的方格占图宽 52 %。
+
 | 编号 | 条款 | 准备 / 输入 | 预期 |
 | :--- | :--- | :--- | :--- |
 | P2-PIP-01 | 第 3 步 | 空白帧 | found false，corners null，pose null，intrinsics { fx = fy = 277.1281292, cx 159.5, cy 89.5 }，`ms` 有限且 ≥ 0 |
@@ -429,22 +432,22 @@ D1–D14 均取方案 A。
 | P2-PIP-04 | 第 2 步（spy） | 5 帧移动的画面 | `findChessboardCorners` 的参数是帧尺寸的 `GrayImage`（数据等于 `rgbaToGray(rgba)`）以及 9、6；`previous` 先是 null 或缺省，之后是上一次调用的返回值（原始角点），且与平滑后的输出不同 |
 | P2-PIP-05 | 第 2 步，丢弃提示（spy） | 未找到的帧之后；`reset()` 之后；尺寸变化之后 | `previous` 为 null 或缺省 |
 | P2-PIP-06 | 第 2、4 步（OQ-33） | 检测成功但 `solvePlanarPnP` 被 mock 成 null；看下一帧 | 下一次调用的 `previous` 是该帧的原始角点 |
-| P2-PIP-07 | 第 4 步平滑（spy） | 10 帧移动画面，平滑开；以及关 | 开：corners 与一个单独的 `createCornerFilter()` 喂入原始角点和帧时间得到的结果完全相同。关：等于原始角点 |
+| P2-PIP-07 | 第 4 步平滑（spy，OQ-75） | 10 帧移动画面，平滑开；以及关 | 开：corners 与一个单独的 `createCornerFilter()` 喂入原始角点和帧时间得到的结果完全相同。关：等于原始角点 |
 | P2-PIP-08 | 第 3 步重置滤波器 | 找到、找到、未找到、找到 | 第 4 帧输出的 corners 等于它的原始角点 |
 | P2-PIP-09 | 第 4 步，`autoFocal` 为 false（spy） | 10 帧，hfovDeg 60 和 75 | 从不调用 `estimateFocal`；每帧 fx = (w/2)/tan(hfov/2) |
-| P2-PIP-10 | 第 4 步，`autoFocal` 为 true（mock） | `estimateFocal` 按脚本返回 400、null、410、405、395、402、… | 每个找到的帧调用一次，参数为 (boardCorners(), 原始角点, width, height)；每帧的 fx 符合 §5.4 的跟踪器规则，且该帧自己的估计值在构造 K 之前加入 |
-| P2-PIP-11 | 第 4 步 + 焦距跟踪器，端到端 | 640×360，真实 hfov 50°，倾角 40–50°，12 帧；再用真实 hfov 30° | 第 12 帧后 abs(fx/f_true − 1) ≤ 10 %；30° 时 fx = 879.1928（宽 640 下的 40° 钳位），误差 ≤ 1e−9 |
+| P2-PIP-10 | 第 4 步，`autoFocal` 为 true（mock，OQ-71、OQ-75） | `estimateFocal` 按脚本返回 400、null、410、405、395、402、…，用含一帧丢失的 320×180 帧；再在 8 帧 640×360 画面上返回约 1194 px（1190、1196、1194、null、1200、1188、1193、1197） | 每个找到的帧调用一次，参数为 (boardCorners(), 原始角点, width, height)；每帧的 fx 符合 §5.4 的跟踪器规则，且该帧自己的估计值在构造 K 之前加入。640×360 时从第 5 个估计值起 fx = 879.1928（宽 640 下的 40° 钳位），误差 ≤ 1e−9 |
+| P2-PIP-11 | 第 4 步 + 焦距跟踪器，端到端（OQ-71） | 640×360，真实 hfov 50°，相对光轴倾斜 40–50°，方格占图宽 45 %（在 OQ-24 范围内），12 帧 | 第 12 帧后 abs(fx/f_true − 1) ≤ 10 % |
 | P2-PIP-12 | 第 5 步，转移 | 每次调用后用 `structuredClone(…, { transfer })` 分离 corners、`pose.R`、`pose.t` 的 buffer；平滑开和关 | 后续调用不抛错，结果与不分离的运行一致（`ms` 除外） |
 | P2-PIP-13 | 第 5 步，确定性 | 两条新流水线，同样 20 帧，含找到、丢失、尺寸变化和 `reset()` | 输出相同（`ms` 除外） |
 | P2-PIP-14 | 第 1 步 | A：先 8 帧 320×180，再 6 帧 180×320。B：新流水线只处理这 6 帧 | 输出相同；内参回到 180×320 的默认值 |
 | P2-PIP-15 | 第 6 步 | 序列中途 `reset()` | 之后的输出与新流水线相同 |
-| P2-PIP-16 | 第 4 步，PnP 返回 null（mock） | `solvePlanarPnP` 返回 null | found false，corners null，pose null，intrinsics = 跟踪器当前值；下一个找到的帧 corners 等于其原始角点 |
+| P2-PIP-16 | 第 4 步，PnP 返回 null（mock，OQ-75） | `solvePlanarPnP` 返回 null | found false，corners null，pose null，intrinsics = 跟踪器当前值；下一个找到的帧 corners 等于其原始角点 |
 | P2-PIP-17 | 第 2 步，灰度转换 | 只看红色通道是反色标定板的 RGBA（灰度 80/180） | 找到；角点 0 与灰度真值的角点 0 相距 ≤ 1 px |
 | P2-PIP-18 | 合理性检查，非契约界限 | 640×360，真实 hfov 60°，`autoFocal` false，倾角 30–50°，标定板 ≥ 图宽 50 % | 旋转误差 ≤ 2°，平移误差 ≤ 3 % |
 | P2-PIP-19 | 默认值 | `createPipeline()` 与 `createPipeline({ hfovDeg: 60, autoFocal: true, smoothing: true })`，15 帧 | 输出相同（`ms` 除外） |
 | P2-PIP-20 | §8 自包含 | 复制 `frame.rgba` 的字节 | `process` 之后不变 |
 | P2-PIP-21 | 格式错误的帧（OQ-35） | 在有效帧之间夹一个长度为 4 · w · h − 4 的 `rgba` | `process` 抛 `RangeError`；之后各帧的输出与没有这一帧的运行相同 |
-| P2-PIP-22 | 第 3 步的内参（OQ-34） | 已有 ≥ 5 个脚本估计值之后的未找到帧 | fx = fy = 跟踪器的焦距，cx = (w − 1)/2，cy = (h − 1)/2 |
+| P2-PIP-22 | 第 3 步的内参（OQ-34、OQ-75） | 已有 ≥ 5 个脚本估计值之后的未找到帧 | fx = fy = 跟踪器的焦距，cx = (w − 1)/2，cy = (h − 1)/2 |
 
 ### 4.8 `handleWorkerMessage` 与 `tracker.worker.ts`（§5.4）
 
@@ -474,8 +477,8 @@ D1–D14 均取方案 A。
 
 | 编号 | 条款 | 准备 / 输入 | 预期 |
 | :--- | :--- | :--- | :--- |
-| P2-ARCH-01 | §4 依赖方向 | 扫描 `src/ar` 中的 import 语句 | board：无依赖；chessboard → board；pose：只有类型导入；pipeline → chessboard、pose、board；tracker.worker → pipeline；tracker 只通过 `import type` 依赖 pipeline 和 pose |
-| P2-ARCH-02 | §4 不依赖 DOM，worker 里没有 three.js | 同上 | 运行时不导入 `three`、`react` 或 `src/components`；除 `tracker.ts` 的默认依赖外不出现 `window`、`document` |
+| P2-ARCH-01 | §4 依赖方向（OQ-73） | 用 TypeScript 编译器解析 `src/ar` 中的 import 语句 | board：无依赖；chessboard → board；pose：只有类型导入；pipeline → chessboard、pose、board；tracker.worker → pipeline；tracker 只通过 `import type` 依赖 pipeline 和 pose。§4 未列出的模块判为失败；board、chessboard、pose、pipeline 和 tracker.worker 必须存在；tracker.ts 从 P3 起检查 |
+| P2-ARCH-02 | §4 不依赖 DOM，worker 里没有 three.js（OQ-73） | 同上 | 运行时不导入 `three`、`react` 或 `src/components`。不把全局对象 `window`、`document`、`navigator`、`self`、`postMessage`、`requestAnimationFrame` 和 `cancelAnimationFrame` 当作值使用，例外是 `tracker.worker` 中的 `self` 和 `postMessage`，以及 `tracker.ts` 中的其余几个；在 P3 把后者限定到默认依赖之前，`tracker.ts` 里任何位置都可以用 |
 
 ## 5. P3 摄像头 AR 浮层
 
@@ -696,9 +699,18 @@ P2a 针对 OQ-69 和 OQ-70 的补充，2026-11-02，针对已实现的 `src/ar/p
 - P2-PNP-16 有区分力：把 `pose.ts` 复制到 scratch 并去掉其中的 t_z > 0 检查后，三块标定板分别得到 t_z 为 −1.000、−2.642、−2.362 的位姿（rms ≤ 1.3 · 10⁻¹³），P2-PNP-16 因此失败；45 个用例中只有它能发现这个改动。
 - `npx vitest run`：8 个文件共 137 个测试，128 个通过、1 个失败（P2-PM-06）、8 个跳过。`npx tsc --noEmit` 和 `npx eslint tests`：无报错。
 
+P2b 的 Red 检查，2026-11-03，针对 `src/ar/pipeline.ts` 的骨架代码（每个函数都抛出 `new Error("not implemented")`）和 `src/ar/tracker.worker.ts`（导入时即抛错）：
+- 六个 P2b 文件共 61 个测试，每个用例一个：`filter.test.ts` 中 CF 12 个、FT 11 个，`pipeline.test.ts` 中 PIP 13 个，`pipeline.spy.test.ts` 中 PIP 9 个，OPT 1 个，`worker.test.ts` 中 WRK 10 个、WKE 3 个，ARCH 2 个。59 个失败，原因都是 `Error: not implemented`：25 个由 `createPipeline` 抛出，12 个由 `createCornerFilter`，11 个由 `createFocalTracker`，8 个由 `handleWorkerMessage`，3 个来自导入 worker 模块，没有其他原因。P2-ARCH-01 和 02 通过，因为骨架代码唯一的导入是来自 `./pose` 的 `import type`。在 `src/ar` 的 scratch 副本上，它们对 11 种故意的违规都会失败（违反 §4 的运行时导入、运行时加载 `three` 或 `src/components`、在规定模块之外使用 `self` 或 `document`、未知模块或缺失模块），对 5 种允许的写法都会通过（仅类型的导入、`tracker.ts` 中的 `window`、注释和字符串、类型位置上的 `typeof window`）。
+- `npx vitest run`：14 个文件共 198 个测试，131 个通过、59 个失败、8 个跳过；P1 和 P2a 不变，仍是 129 个通过、8 个跳过。`npx tsc --noEmit` 和 `npx eslint tests`：无报错。
+- 种子和帧在实现之前就已固定。离线用真实的 `chessboard.ts`、`pose.ts` 和一次性的 One Euro 各变体检查：P2-CF-08 中，§7 推荐的写法最差坐标的标准差比为 0.400（界限 0.5），其他写法为 0.390–0.423；P2-CF-09 从第 6 个输出起的最大距离，轴向阶跃 0.202 px、对角线阶跃 0.355 px（界限 0.5），而导数取自上一次原始值的变体会失败（最大 1.02 px），与 OQ-27 的预期一致；P2-CF-10 最多 0.08 px；P2-CF-11 为 3 · 10⁻⁵ px（界限 10⁻³）和移动 0.25 px（界限 < 1）。320×180 和 180×320 序列的 32 帧都能找到，角点 RMS ≤ 0.05 px，焦距估计误差都在 0.3 % 以内。P2-PIP-11 在 hfov 50° 时最终误差 −0.02 %（界限 10 %）。在 OQ-62 范围之外的 hfov 30° 时，当前 `pose.ts` 的 12 个估计都在 1194 px 的 0.2 % 以内；由于契约并不保证这些估计，钳位改为在 P2-PIP-10 中用脚本给出的估计值来测（OQ-71）。P2-PIP-18：最大旋转误差 0.019°（界限 2°），平移误差 0.009 %（界限 3 %）。P2-PIP-17：角点 0 离真值 0.023 px（界限 1 px），而只用红色通道会偏离 146 px。
+- 一个一次性参考实现能通过全部 61 个测试，约 3 s，与执行顺序无关；在其中故意制造的 20 种缺陷，每一种都会让针对它的用例失败：把时间当成秒、导数取自原始值、坐标之间耦合、尺寸变化时不重置、校验之前就重置状态、只用红色通道、丢帧后不重置滤波器、在构建 K 之后才加入估计、共用原始角点数组、用平滑后的角点作提示、位姿为 null 后丢掉提示、把 null 计入样本、取下中位数、不限幅、对默认值限幅、错误文本不对、transfer 列表重复、复制了缓冲区，以及 worker 不发送或发送 null 回复。
+- 2026-11-03 落实 OQ-71–OQ-75：P2-PIP-11 只保留 hfov 50° 的运行，钳位作为 P2-PIP-10 的第二组脚本运行，所以用例仍是 61 个（P2 106 个，合计 238 个）；P2-CF-06、P2-PIP-07、P2-PIP-10、P2-PIP-11、P2-PIP-16、P2-PIP-22 和 P2-ARCH-01–02 的标题都注明了所依据的 OQ。重跑结果：仍是 59 个因 `Error: not implemented` 失败，两个 ARCH 用例通过；`npx vitest run` 131 个通过、59 个失败、8 个跳过；`npx tsc --noEmit` 和 `npx eslint tests` 无报错。参考实现仍能通过全部 61 个测试；缺少钳位的缺陷现在由 P2-FT-07、P2-FT-08 和 P2-PIP-10 发现。
+
+P2b 转绿，2026-11-03：`src/ar/pipeline.ts` 和 `src/ar/tracker.worker.ts` 实现后，61 个 P2b 测试全部通过；`npx vitest run` 190 个通过、8 个跳过；`npx tsc --noEmit` 和 `npx eslint` 无报错。M2-01（OQ-60）：在 `HeroViewport.tsx` 里临时加一处引用后，`next build` 把 worker 打包成一个 Turbopack 启动脚本加一个 19.7 KB 的 chunk（gzip 后 8 KB），其中是流水线、检测器和位姿代码，不含 `WebGLRenderer`，也不含 React；在浏览器面板中从 `out/` 加载时，worker 对一帧 64 × 36 的空白帧回复了 `result`（fx 55.43，缓冲区也传了回来）。之后已删除这处引用。M2-02：lint、tsc 和构建都无报错。
+
 ## 10. 已定问题
 
-2026-11-02 定下；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是其评审时提出的，均于同日定下。"A""B"指本计划初稿中提出的方案（OQ-61–OQ-70 指 P2a 评审时提出的方案）；设计文档 §14 列出了相同的决议。
+2026-11-02 定下；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是其评审时提出的，均于同日定下；OQ-71–OQ-75 是编写 P2b 测试时提出的，2026-11-03 定下。"A""B"指本计划初稿中提出的方案（OQ-61–OQ-70 指 P2a 评审时提出的方案，OQ-71–OQ-75 指 P2b 报告中提出的方案）；设计文档 §14 列出了相同的决议。
 
 ### 10.1 OQ-18、OQ-23、OQ-27 的依据
 
@@ -818,3 +830,8 @@ P2a 针对 OQ-69 和 OQ-70 的补充，2026-11-02，针对已实现的 `src/ar/p
 | OQ-68 | §4 输入 | 初稿之外补充的输入 | A | 保留：hfov −Infinity、高度 360.5、P2-FOC-05 的试验数、P2-FOC-07 的四角方向和 20 % 板宽、P2-PNP-14 的一个加噪输入 | P2-INT-03、P2-INT-04、P2-FOC-05、P2-FOC-07、P2-PNP-14 |
 | OQ-69 | §5.3 后置条件 | 标定板上的点都在相机前方，而板原点在相机后方 | A | 返回 null，以保证 t_z > 0；只有离原点很远的物点才会出现这种情况 | P2-PNP-16 |
 | OQ-70 | §5.3 `projectionMatrix` | 是否校验 K | A | 与 `solvePlanarPnP` 一致：fx、fy、cx、cy 有非有限值，或 fx、fy ≤ 0 时抛出 `RangeError` | P2-PM-06 |
+| OQ-71 | §5.3 `estimateFocal`、§5.4 第 4 步 | 真实 hfov 30° 的 P2-PIP-11 依赖 OQ-62 范围之外的估计 | A | 端到端运行只保留 hfov 50°；40° 钳位改用约 1194 px（宽 640）的脚本估计值来测，作为 P2-PIP-10 的第二组运行 | P2-PIP-10、P2-PIP-11 |
+| OQ-72 | §5.4 `createCornerFilter` | 静止的坐标看不出坐标之间的耦合 | A | P2-CF-06 再让坐标 a 以 σ 0.3 px 抖动做一遍 | P2-CF-06 |
+| OQ-73 | §4 | 架构扫描的范围 | A | §4 未列出的模块判为失败；board、chessboard、pose、pipeline 和 tracker.worker 必须存在，tracker.ts 从 P3 起检查；检查的全局对象为 window、document、navigator、self、postMessage、requestAnimationFrame 和 cancelAnimationFrame，self 和 postMessage 只允许出现在 tracker.worker，其余几个允许出现在 tracker.ts，在 P3 之前不限位置 | P2-ARCH-01、P2-ARCH-02 |
+| OQ-74 | §4 输入 | P2b 各条款范围内补充的输入 | A | 保留：P2-CF-01 的三种数组、P2-CF-02 的重启检查、P2-FT-03 和 P2-FT-11 的窗口位置检查、P2-FT-06 的窗口 4、P2-FT-08 的 hfov 70°、P2-PIP-03 的 5 帧、P2-PIP-04 的每帧一次检测调用、P2-PIP-14 和 P2-PIP-15 的焦距已学到检查、P2-PIP-16 在第 7 帧失败、P2-PIP-21 的 6 种畸形帧、P2-WRK-08 额外的抛出值和消息、P2-WKE-03 允许不传 transfer 列表、P2-OPT-01 额外的非法值和边界值 | P2-CF-01、P2-CF-02、P2-FT-03、P2-FT-06、P2-FT-08、P2-FT-11、P2-PIP-03、P2-PIP-04、P2-PIP-14…16、P2-PIP-21、P2-WRK-08、P2-WKE-03、P2-OPT-01 |
+| OQ-75 | §5.4 第 4 步 | 流水线所用滤波器和焦距跟踪器的参数 | A | `createCornerFilter()` 取默认参数；`createFocalTracker({ hfovDeg })` 其余选项取默认值 | P2-PIP-07、P2-PIP-10、P2-PIP-16、P2-PIP-22 |

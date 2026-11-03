@@ -1,8 +1,8 @@
 # Test plan: Camera AR on a calibration board
 
-Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
+Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included; P2b tests written, red against the skeleton with P2-ARCH-01 and 02 already passing (this plan §9), then green · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
 
-This plan maps the contracts of the design (§5, with the conventions of §6 and the strategy of §9) to test cases, phase by phase (§10 of the design). Decisions D1–D14 are option A. The 60 questions the contract left open are resolved (this plan §10): option A for all except OQ-04, OQ-06, OQ-09, OQ-27 and OQ-47. OQ-61–OQ-68, raised while writing the P2a tests, and OQ-69–OQ-70, raised in their review, are all option A. Section numbers such as "§5.2" refer to the design; "this plan §x" refers to this document.
+This plan maps the contracts of the design (§5, with the conventions of §6 and the strategy of §9) to test cases, phase by phase (§10 of the design). Decisions D1–D14 are option A. The 60 questions the contract left open are resolved (this plan §10): option A for all except OQ-04, OQ-06, OQ-09, OQ-27 and OQ-47. OQ-61–OQ-68, raised while writing the P2a tests, OQ-69–OQ-70, raised in their review, and OQ-71–OQ-75, raised while writing the P2b tests, are all option A. Section numbers such as "§5.2" refer to the design; "this plan §x" refers to this document.
 
 Cases removed by the resolutions, whose IDs are not reused: P1-DET-11 (OQ-09), P2-PNP-06 (OQ-19), P3-TRK-41 (OQ-47), P3-COPY-01, P3-COPY-02 and P4-COPY-01 (OQ-04), and M3-20 (OQ-03).
 
@@ -32,7 +32,7 @@ Cases removed by the resolutions, whose IDs are not reused: P1-DET-11 (OQ-09), P
 | `tests/ar/tracker.test.ts` | P3-TRK | P3 |
 | `tests/app/chessboard-pdf.test.ts` | P4-PDF | P4 |
 
-Helpers live in `tests/ar/helpers/`: `random.ts`, `boardModel.ts`, `linalg.ts`, `render.ts`, `scenes.ts`, `catalog.ts` (every P1 scene), `metrics.ts`, `fixtures.ts` (photo loading), `poses.ts` and `poseCatalog.ts` (P2: pose maths and every seeded P2a input), and from P3 `cameraFakes.ts`. The PDF reader sits next to its only user, in `tests/app/helpers/pdf.ts`. Real photos and their manifest go to `tests/fixtures/board/`.
+Helpers live in `tests/ar/helpers/`: `random.ts`, `boardModel.ts`, `linalg.ts`, `render.ts`, `scenes.ts`, `catalog.ts` (every P1 scene), `metrics.ts`, `fixtures.ts` (photo loading), `poses.ts` and `poseCatalog.ts` (P2: pose maths and every seeded P2a input), `frames.ts`, `filterInputs.ts` and `sourceScan.ts` (P2b: pipeline frames, corner-filter signals and the import scan), and from P3 `cameraFakes.ts`. The PDF reader sits next to its only user, in `tests/app/helpers/pdf.ts`. Real photos and their manifest go to `tests/fixtures/board/`.
 
 Module mocks (`vi.mock`) appear only in `pipeline.spy.test.ts`, and only for calls that §5.4 itself specifies: the detector call with its hint, `estimateFocal` and `solvePlanarPnP`. Everything else goes through the public interfaces.
 
@@ -121,6 +121,7 @@ Note on mirroring: the 10×7 board's colouring is symmetric about its long axis,
 - `bytesOf(view)` copies the bytes behind a typed array for immutability checks; `toFloat32` builds hints.
 - `poses.ts` (P2): seeded board placements (`samplePose` within an envelope, `placeRotated` for a given rotation), exact pinhole projection that does not check the sign of z, Gaussian pixel noise, the reprojection RMS of §5.3, the homography-only pose that P2-PNP-10 compares against (K⁻¹ times the `fitHomography` result, λ from the mean of the two column norms with t_z > 0, R the nearest rotation by polar decomposition), the §6 matrices B and F, column-major 4 × 4 products and determinant, and the cover-fit mapping from pixels to NDC derived from the layout rather than from the §5.3 formulas.
 - `poseCatalog.ts` (P2): every seeded P2a input, one stream per trial (`seedFor` of the trial label), so the tests of a group share their trials and an offline check can replay them.
+- `frames.ts` (P2b): RGBA frames with R = G = B from the grey renderer, board sequences whose every frame must be nominal, blank frames, the focal tracker rule of §5.4 written out independently as a reference, and a view of pipeline outputs without `ms` for exact comparisons. `filterInputs.ts`: the seeded rest, jitter, step, random and moving corner signals of §4.5. `sourceScan.ts`: the imports and browser-global uses of a module, parsed with the TypeScript compiler so that comments and strings cannot fool the scan.
 
 ### 2.6 Fakes for `startCameraAR` (`cameraFakes.ts`, P3)
 
@@ -154,7 +155,7 @@ Tests always pass every dependency, and `startCameraAR` resolves a default only 
 - Seeds are fixed before the implementation exists (Red phase) and are not changed to make a run pass; changing a seed needs a note in this plan.
 - No golden images or stored outputs: truth is computed analytically, so a last-ulp difference between Node versions can at most flip one 8-bit rounding, which bounded assertions absorb. Determinism tests compare two runs in the same process.
 - Wall-clock time appears only in P1-PERF, with warm-up runs, medians and 3× bounds (OQ-05). Every other test uses the manual clock and scheduler.
-- Each test builds its own pipeline, filter, tracker and fakes; `vi.restoreAllMocks()` and `vi.unstubAllGlobals()` run after every test that uses them. Heavy P1 cases set a 120 s timeout.
+- Each test builds its own pipeline, filter, tracker and fakes; `vi.restoreAllMocks()` and `vi.unstubAllGlobals()` run after every test that uses them. In Vitest 4 `vi.restoreAllMocks()` only restores spies made with `vi.spyOn`: it neither clears nor resets the `vi.fn`s created in a `vi.mock` factory, so `pipeline.spy.test.ts` also calls `mockReset()` on its three wrappers, which clears their calls and puts each back on the real function. Heavy P1 cases set a 120 s timeout.
 
 ### 2.9 Helper self-tests
 
@@ -393,7 +394,7 @@ In this section tilt is the angle between the board normal and the optical axis 
 | P2-CF-03 | Length change | 108 → 10 → 108 values | A copy at each change; later calls smooth from the new start |
 | P2-CF-04 | Time not later | The same time twice; an earlier time | A copy, and the filter restarts from it |
 | P2-CF-05 | Constant input | 100 identical frames | Output equals the input on every call |
-| P2-CF-06 | Each coordinate independent | Coordinate a static, coordinate b moving at 300 px/s, filtered in one array | Equals two separate one-coordinate filters within 1e−12 |
+| P2-CF-06 | Each coordinate independent (OQ-72) | Coordinate a static, coordinate b moving at 300 px/s, filtered in one array; again with a jittering by σ 0.3 px, since a static coordinate cannot reveal coupling | Equals two separate one-coordinate filters within 1e−12 |
 | P2-CF-07 | One Euro is a first-order low-pass | 500 random frames | Each output lies between the previous output and the current input; no overshoot on steps |
 | P2-CF-08 | Jitter (OQ-28) | 108 static coordinates with σ 0.3 px seeded jitter, 30 fps, 300 frames | For every coordinate, the output std over frames 11–300 ≤ 0.5 × its input std |
 | P2-CF-09 | Step ≥ 12 px (OQ-29) | Converged, then +12 px in x, −12 px in y, and a 12 px diagonal step; noise-free | From the 6th output at the new position on, every corner within 0.5 px of it (Euclidean) |
@@ -421,6 +422,8 @@ In this section tilt is the angle between the board normal and the optical axis 
 
 Frames are 320×180 (nominal 12 px squares fit) unless stated, RGBA from the grey renderer with R = G = B, 1000/30 ms apart. "Raw" corners are those returned by the spied detector call.
 
+The 320×180 sequence is drawn with a true hfov of 52°, the board about 30° from the ray, its shortest edge 12.3 px and its squares spanning about 52 % of the width, so that a learned focal length (328 px) differs clearly from the 60° default (277 px); the 180×320 sequence uses hfov 56°. P2-PIP-11 places the board inside the OQ-24 envelope: squares spanning 45 % of the width, tilt 40–50° from the optical axis, centre near the principal point, so that at hfov 50° every frame's estimate is due a value (OQ-62). A camera narrower than the 40° bound would be outside the 40–100° range that OQ-62 assumes, so the clamp is tested with scripted estimates on the first 8 of these frames, in P2-PIP-10 (OQ-71). P2-PIP-18 uses squares spanning 52 % of the width.
+
 | ID | Clause | Setup / input | Expected |
 | :--- | :--- | :--- | :--- |
 | P2-PIP-01 | Step 3 | Blank frame | found false, corners null, pose null, intrinsics { fx = fy = 277.1281292, cx 159.5, cy 89.5 }, `ms` finite and ≥ 0 |
@@ -429,22 +432,22 @@ Frames are 320×180 (nominal 12 px squares fit) unless stated, RGBA from the gre
 | P2-PIP-04 | Step 2 (spy) | 5 moving frames | `findChessboardCorners` called with a `GrayImage` of the frame size whose data equals `rgbaToGray(rgba)`, and 9, 6; `previous` null or absent first, then the previous call's return value (raw), which differs from the smoothed output |
 | P2-PIP-05 | Step 2, hint dropped (spy) | After a not-found frame; after `reset()`; after a size change | `previous` null or absent |
 | P2-PIP-06 | Steps 2 and 4 (OQ-33) | Detection succeeds, `solvePlanarPnP` mocked to null; next frame | The next call's `previous` is that frame's raw corners |
-| P2-PIP-07 | Step 4 smoothing (spy) | 10 moving frames, smoothing on; and off | On: corners equal a standalone `createCornerFilter()` fed the raw corners and frame times, exactly. Off: equal the raw corners |
+| P2-PIP-07 | Step 4 smoothing (spy, OQ-75) | 10 moving frames, smoothing on; and off | On: corners equal a standalone `createCornerFilter()` fed the raw corners and frame times, exactly. Off: equal the raw corners |
 | P2-PIP-08 | Step 3 filter reset | found, found, not found, found | The 4th output's corners equal its raw corners |
 | P2-PIP-09 | Step 4, `autoFocal` false (spy) | 10 frames, hfovDeg 60 and 75 | `estimateFocal` never called; fx = (w/2)/tan(hfov/2) on every frame |
-| P2-PIP-10 | Step 4, `autoFocal` true (mock) | `estimateFocal` scripted: 400, null, 410, 405, 395, 402, … | Called once per found frame with (boardCorners(), raw, width, height); fx on each frame follows the tracker rule of §5.4, with that frame's estimate added before K is built |
-| P2-PIP-11 | Steps 4 + tracker, end to end | 640×360, true hfov 50°, tilt 40–50°, 12 frames; again with true hfov 30° | After frame 12, abs(fx/f_true − 1) ≤ 10 %; with 30°: fx = 879.1928 (the 40° clamp at width 640) within 1e−9 |
+| P2-PIP-10 | Step 4, `autoFocal` true (mock, OQ-71, OQ-75) | `estimateFocal` scripted: 400, null, 410, 405, 395, 402, … on 320×180 frames with a lost frame; and about 1194 px (1190, 1196, 1194, null, 1200, 1188, 1193, 1197) on 8 frames at 640×360 | Called once per found frame with (boardCorners(), raw, width, height); fx on each frame follows the tracker rule of §5.4, with that frame's estimate added before K is built. At 640×360, from the 5th estimate on, fx = 879.1928 (the 40° clamp at width 640) within 1e−9 |
+| P2-PIP-11 | Steps 4 + tracker, end to end (OQ-71) | 640×360, true hfov 50°, tilt 40–50° from the optical axis, squares spanning 45 % of the width (inside OQ-24), 12 frames | After frame 12, abs(fx/f_true − 1) ≤ 10 % |
 | P2-PIP-12 | Step 5, transfer | After each call, detach the corners, `pose.R` and `pose.t` buffers with `structuredClone(…, { transfer })`; smoothing on and off | Later calls do not throw and match a run without detaching, `ms` aside |
 | P2-PIP-13 | Step 5, determinism | Two fresh pipelines, the same 20 frames with found, lost, size change and `reset()` | Identical outputs, `ms` aside |
 | P2-PIP-14 | Step 1 | A: 8 frames at 320×180, then 6 at 180×320. B: a fresh pipeline on the same 6 | Identical outputs; intrinsics back to the default for 180×320 |
 | P2-PIP-15 | Step 6 | `reset()` in the middle of a sequence | Later outputs equal a fresh pipeline's |
-| P2-PIP-16 | Step 4, PnP null (mock) | `solvePlanarPnP` returns null | found false, corners null, pose null, intrinsics = the tracker's value; the next found frame's corners equal its raw corners |
+| P2-PIP-16 | Step 4, PnP null (mock, OQ-75) | `solvePlanarPnP` returns null | found false, corners null, pose null, intrinsics = the tracker's value; the next found frame's corners equal its raw corners |
 | P2-PIP-17 | Step 2, grey conversion | RGBA whose red channel alone shows the inverted board (grey 80/180) | found; corner 0 within 1 px of corner 0 of the grey truth |
 | P2-PIP-18 | Sanity, not a contract bound | 640×360, true hfov 60°, `autoFocal` false, tilt 30–50°, board ≥ 50 % of the width | Rotation error ≤ 2°, translation error ≤ 3 % |
 | P2-PIP-19 | Defaults | `createPipeline()` vs `createPipeline({ hfovDeg: 60, autoFocal: true, smoothing: true })`, 15 frames | Identical outputs, `ms` aside |
 | P2-PIP-20 | §8 self-contained | Byte copy of `frame.rgba` | Unchanged after `process` |
 | P2-PIP-21 | Malformed frame (OQ-35) | `rgba` of length 4 · w · h − 4, between valid frames | `process` throws `RangeError`; the following frames give the outputs of a run without the malformed frame |
-| P2-PIP-22 | Step 3 intrinsics (OQ-34) | A not-found frame after ≥ 5 scripted estimates | fx = fy = the tracker's focal, cx = (w − 1)/2, cy = (h − 1)/2 |
+| P2-PIP-22 | Step 3 intrinsics (OQ-34, OQ-75) | A not-found frame after ≥ 5 scripted estimates | fx = fy = the tracker's focal, cx = (w − 1)/2, cy = (h − 1)/2 |
 
 ### 4.8 `handleWorkerMessage` and `tracker.worker.ts` (§5.4)
 
@@ -474,8 +477,8 @@ Frames are 320×180 (nominal 12 px squares fit) unless stated, RGBA from the gre
 
 | ID | Clause | Setup / input | Expected |
 | :--- | :--- | :--- | :--- |
-| P2-ARCH-01 | §4 dependency directions | Scan the import statements in `src/ar` | board: none; chessboard → board; pose: type-only imports; pipeline → chessboard, pose, board; tracker.worker → pipeline; tracker → pipeline and pose through `import type` only |
-| P2-ARCH-02 | §4 DOM-free, no three.js in the worker | Same scan | No runtime import of `three`, `react` or `src/components`; no `window` or `document` outside the defaults in `tracker.ts` |
+| P2-ARCH-01 | §4 dependency directions (OQ-73) | Scan the import statements in `src/ar`, parsed with the TypeScript compiler | board: none; chessboard → board; pose: type-only imports; pipeline → chessboard, pose, board; tracker.worker → pipeline; tracker → pipeline and pose through `import type` only. A module that §4 does not list fails; board, chessboard, pose, pipeline and tracker.worker must exist; tracker.ts is checked from P3 |
+| P2-ARCH-02 | §4 DOM-free, no three.js in the worker (OQ-73) | Same scan | No runtime import of `three`, `react` or `src/components`. The globals `window`, `document`, `navigator`, `self`, `postMessage`, `requestAnimationFrame` and `cancelAnimationFrame` are not used as values, except `self` and `postMessage` in `tracker.worker` and the others in `tracker.ts`, anywhere until P3 limits them to its defaults |
 
 ## 5. P3 Camera AR overlay
 
@@ -696,9 +699,18 @@ P2a addendum for OQ-69 and OQ-70, 2026-11-02, against the implemented `src/ar/po
 - P2-PNP-16 discriminates: a scratch copy of `pose.ts` without its t_z > 0 check returns, for the three boards, poses with t_z −1.000, −2.642 and −2.362 (rms ≤ 1.3 · 10⁻¹³) and so fails P2-PNP-16, the only one of the 45 cases that catches the change.
 - `npx vitest run`: 137 tests in 8 files, 128 passed, 1 failed (P2-PM-06) and 8 skipped. `npx tsc --noEmit` and `npx eslint tests`: clean.
 
+P2b Red check, 2026-11-03, against the skeleton of `src/ar/pipeline.ts` (every function throws `new Error("not implemented")`) and `src/ar/tracker.worker.ts` (throws on import):
+- The six P2b files hold 61 tests, one per case: CF 12 and FT 11 in `filter.test.ts`, PIP 13 in `pipeline.test.ts` and 9 in `pipeline.spy.test.ts`, OPT 1, WRK 10 and WKE 3 in `worker.test.ts`, ARCH 2. 59 fail with `Error: not implemented`: 25 thrown by `createPipeline`, 12 by `createCornerFilter`, 11 by `createFocalTracker`, 8 by `handleWorkerMessage`, and 3 by importing the worker module; none fails for another reason. P2-ARCH-01 and 02 pass, since the skeleton's only import is `import type` from `./pose`. On a scratch copy of `src/ar` they fail on each of 11 deliberate violations (runtime imports against §4, `three` or `src/components` loaded at runtime, `self` or `document` outside their modules, an unknown or a missing module) and pass on 5 allowed patterns (type-only imports, `window` in `tracker.ts`, comments and strings, `typeof window` in a type).
+- `npx vitest run`: 198 tests in 14 files, 131 passed, 59 failed and 8 skipped; P1 and P2a unchanged at 129 passed and 8 skipped. `npx tsc --noEmit` and `npx eslint tests`: clean.
+- The seeds and frames were fixed before the implementation. Offline, with the real `chessboard.ts` and `pose.ts` and throwaway One Euro variants: P2-CF-08 worst coordinate ratio 0.400 (bound 0.5) for the formulation §7 recommends, 0.390–0.423 for the others; P2-CF-09 worst distance from the 6th output on 0.202 px for the axis steps and 0.355 px for the diagonal (bound 0.5), while the variants with the derivative against the previous raw value fail it (up to 1.02 px), as OQ-27 anticipates; P2-CF-10 at most 0.08 px; P2-CF-11 3 · 10⁻⁵ px (bound 10⁻³) and 0.25 px moved (bound < 1). All 32 frames of the 320×180 and 180×320 sequences are found with corner RMS ≤ 0.05 px and give focal estimates within 0.3 %. P2-PIP-11 ends at −0.02 % (bound 10 %) at hfov 50°. At hfov 30°, outside the OQ-62 range, all 12 estimates of the current `pose.ts` lay within 0.2 % of 1194 px; since the contract does not promise them, the clamp is now tested with scripted estimates in P2-PIP-10 (OQ-71). P2-PIP-18: worst rotation 0.019° (bound 2°) and translation 0.009 % (bound 3 %). P2-PIP-17: corner 0 is 0.023 px from the truth (bound 1 px), while the red channel alone would put it 146 px away.
+- A throwaway reference implementation passes all 61 tests in about 3 s, in any order, and each of 20 deliberate defects in it fails the case aimed at it: the time read as seconds, the derivative against the raw value, coupled coordinates, no reset on a size change, state reset before validation, the red channel only, no filter reset after a lost frame, the estimate added after K is built, a shared raw array, the smoothed hint, the hint dropped after a null pose, nulls counted, the lower middle value, no clamp, a clamped default, a wrong error text, a duplicated transfer, a copied buffer, and a worker that posts nothing or posts null replies.
+- OQ-71–OQ-75 applied on 2026-11-03: P2-PIP-11 keeps only the hfov-50° run, P2-PIP-10 takes the clamp as a second scripted run, so there are still 61 cases (P2 106, total 238), and the titles of P2-CF-06, P2-PIP-07, P2-PIP-10, P2-PIP-11, P2-PIP-16, P2-PIP-22 and P2-ARCH-01–02 cite the OQs they rely on. Rerun: the same 59 failures with `Error: not implemented` and the two passing ARCH cases; `npx vitest run` 131 passed, 59 failed, 8 skipped; `npx tsc --noEmit` and `npx eslint tests` clean. The reference still passes all 61; the missing clamp is now caught by P2-FT-07, P2-FT-08 and P2-PIP-10.
+
+P2b Green, 2026-11-03: all 61 P2b tests pass with `src/ar/pipeline.ts` and `src/ar/tracker.worker.ts` implemented; `npx vitest run` 190 passed and 8 skipped; `npx tsc --noEmit` and `npx eslint` clean. M2-01 (OQ-60): with a temporary reference in `HeroViewport.tsx`, `next build` emits the worker as a Turbopack bootstrap plus one 19.7 KB chunk (8 KB gzipped) holding the pipeline, detector and pose, with no `WebGLRenderer` and no React in it; served from `out/` in the browser pane, the worker answered a blank 64 × 36 frame with a `result` (fx 55.43, the buffer returned). The reference was then removed. M2-02: lint, tsc and build clean.
+
 ## 10. Resolved questions
 
-Resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in their review, all resolved the same day. "A" and "B" refer to the options proposed in the first draft of this plan (for OQ-61–OQ-70, in the P2a review); the design's §14 lists the same resolutions.
+Resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in their review, all resolved the same day; OQ-71–OQ-75 were raised while writing the P2b tests and resolved on 2026-11-03. "A" and "B" refer to the options proposed in the first draft of this plan (for OQ-61–OQ-70, in the P2a review; for OQ-71–OQ-75, in the P2b report); the design's §14 lists the same resolutions.
 
 ### 10.1 Evidence behind OQ-18, OQ-23 and OQ-27
 
@@ -818,3 +830,8 @@ Passing milliseconds where seconds are expected leaves 0.06 px of a 12 px step a
 | OQ-68 | §4 inputs | Inputs added beyond the first draft | A | Kept: hfov −Infinity, height 360.5, the P2-FOC-05 trial counts, the P2-FOC-07 corner directions with a 20 % board, a noisy P2-PNP-14 input | P2-INT-03, P2-INT-04, P2-FOC-05, P2-FOC-07, P2-PNP-14 |
 | OQ-69 | §5.3 postconditions | Board points in front of the camera while the board origin is behind it | A | null, so that t_z > 0 holds; only object points far from their origin can cause this | P2-PNP-16 |
 | OQ-70 | §5.3 `projectionMatrix` | Validation of K | A | As in `solvePlanarPnP`: a non-finite fx, fy, cx or cy, or fx or fy ≤ 0, throws `RangeError` | P2-PM-06 |
+| OQ-71 | §5.3 `estimateFocal`, §5.4 step 4 | P2-PIP-11 at a true hfov of 30° relies on estimates outside the OQ-62 range | A | The end-to-end run stays at hfov 50°; the 40° clamp is tested with scripted estimates of about 1194 px at width 640, as a second run of P2-PIP-10 | P2-PIP-10, P2-PIP-11 |
+| OQ-72 | §5.4 `createCornerFilter` | A static coordinate cannot reveal coupling between coordinates | A | P2-CF-06 also runs with coordinate a jittering by σ 0.3 px | P2-CF-06 |
+| OQ-73 | §4 | Scope of the architecture scan | A | Modules not listed in §4 fail; board, chessboard, pose, pipeline and tracker.worker must exist, tracker.ts is checked from P3; the globals checked are window, document, navigator, self, postMessage, requestAnimationFrame and cancelAnimationFrame, with self and postMessage allowed only in tracker.worker and the others in tracker.ts, anywhere until P3 | P2-ARCH-01, P2-ARCH-02 |
+| OQ-74 | §4 inputs | Inputs added within the P2b clauses | A | Kept: three arrays in P2-CF-01, the restart check in P2-CF-02, window-slot checks in P2-FT-03 and P2-FT-11, a window of 4 in P2-FT-06, hfov 70° in P2-FT-08, five frames in P2-PIP-03, one detector call per frame in P2-PIP-04, learned-focal checks in P2-PIP-14 and P2-PIP-15, the failure at frame 7 in P2-PIP-16, six malformed frames in P2-PIP-21, extra thrown values and messages in P2-WRK-08, an absent transfer list in P2-WKE-03, extra and boundary values in P2-OPT-01 | P2-CF-01, P2-CF-02, P2-FT-03, P2-FT-06, P2-FT-08, P2-FT-11, P2-PIP-03, P2-PIP-04, P2-PIP-14…16, P2-PIP-21, P2-WRK-08, P2-WKE-03, P2-OPT-01 |
+| OQ-75 | §5.4 step 4 | Parameters of the pipeline's filter and focal tracker | A | `createCornerFilter()` at its defaults; `createFocalTracker({ hfovDeg })` with the other options at their defaults | P2-PIP-07, P2-PIP-10, P2-PIP-16, P2-PIP-22 |
