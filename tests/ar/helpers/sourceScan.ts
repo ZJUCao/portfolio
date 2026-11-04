@@ -22,6 +22,8 @@ export interface ImportEdge {
 export interface GlobalUse {
   readonly name: string;
   readonly line: number;
+  /** The top-level function or variable declaration the use sits in, or null at the top level itself. */
+  readonly scope: string | null;
 }
 
 export interface ModuleScan {
@@ -73,7 +75,16 @@ export function scanModule(path: string, globalNames: readonly string[]): Module
   const add = (specifier: string, typeOnly: boolean, node: ts.Node): void => {
     imports.push({ specifier, typeOnly, line: lineOf(node), target: targetOf(specifier, path) });
   };
-  const visit = (node: ts.Node): void => {
+  // The top-level declaration a node sits in, for GlobalUse.scope
+  const scopeOf = (statement: ts.Node): string | null => {
+    if ((ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement)) && statement.name) return statement.name.text;
+    if (ts.isVariableStatement(statement)) {
+      const first = statement.declarationList.declarations[0];
+      return first && ts.isIdentifier(first.name) ? first.name.text : null;
+    }
+    return null;
+  };
+  const visit = (node: ts.Node, scope: string | null): void => {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const clause = node.importClause;
       const named = clause?.namedBindings && ts.isNamedImports(clause.namedBindings) ? clause.namedBindings : undefined;
@@ -93,11 +104,11 @@ export function scanModule(path: string, globalNames: readonly string[]): Module
     } else if (ts.isImportTypeNode(node) && ts.isLiteralTypeNode(node.argument) && ts.isStringLiteral(node.argument.literal)) {
       add(node.argument.literal.text, true, node);
     } else if (ts.isIdentifier(node) && globalNames.includes(node.text) && isValueReference(node)) {
-      globals.push({ name: node.text, line: lineOf(node) });
+      globals.push({ name: node.text, line: lineOf(node), scope });
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => visit(child, node === source ? scopeOf(child) : scope));
   };
-  visit(source);
+  visit(source, null);
   const base = path.split(/[\\/]/).pop() as string;
   return { name: base.slice(0, -extname(base).length), path, imports, globals };
 }

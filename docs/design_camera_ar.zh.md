@@ -1,6 +1,6 @@
 # 设计：基于标定板的摄像头 AR
 
-状态：**已确认（2026-11-02）**，P1 和 P2 已完成，下一期 P3 · 档位：Full · 分期：P1–P4，其中 P2 分两批（§10）
+状态：**已确认（2026-11-02）**，P1、P2 和 P3 已完成，下一期 P4 · 档位：Full · 分期：P1–P4，其中 P2 分两批（§10）
 
 ## 1. 目标
 
@@ -471,12 +471,12 @@ sequenceDiagram
 - [x] P1 检测器：2026-11-02 测试全绿（84 个通过，8 个照片用例在有照片前跳过），已审阅并提交为 `claude/camera-ar` 分支上的 `b98e03c`
 - [x] P2a 位姿：2026-11-02 测试全绿（45 个位姿测试全部通过；全套 129 个通过、8 个跳过），已审阅并提交到 `claude/camera-ar` 分支
 - [x] P2b worker 流水线：2026-11-03 测试全绿（61 个 P2b 测试全部通过；全套 190 个通过、8 个跳过），已检查 worker 打包（OQ-60），已审阅并提交到 `claude/camera-ar` 分支
-- [ ] P3 摄像头 AR 全屏叠层
+- [x] P3 摄像头 AR 全屏叠层：2026-11-04 测试全绿（41 个 P3 测试和 H-09 全部通过；全套 232 个通过、8 个跳过），lint、tsc 和构建都无报错；已在浏览器面板中用画布流代替摄像头检查（测试计划 §9）；尚待检查 M3-01、M3-11、M3-13，以及 M3-15–M3-19 的设备和标定板；在 `claude/camera-ar-p3` 分支上等待评审
 - [ ] P4 标定板界面、二维码、PDF
 
 ## 14. 已定细节
 
-由测试计划提出，已于 2026-11-02 定案；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是 P2a 评审时提出的，都在同日定案；OQ-71–OQ-75 是编写 P2b 测试时提出的，于 2026-11-03 定案。每一行都属于契约。
+由测试计划提出，已于 2026-11-02 定案；OQ-61–OQ-68 是编写 P2a 测试时提出的，OQ-69–OQ-70 是 P2a 评审时提出的，都在同日定案；OQ-71–OQ-75 是编写 P2b 测试时提出的，于 2026-11-03 定案。OQ-76–OQ-82 是 2026-11-04 实现 P3 时定下的，待 P3 评审时确认。每一行都属于契约。
 
 | # | 方面 | 结论 |
 | :--- | :--- | :--- |
@@ -555,3 +555,10 @@ sequenceDiagram
 | OQ-73 | 架构扫描（测试） | §4 没列出的模块判为失败；board、chessboard、pose、pipeline 和 tracker.worker 必须存在，tracker.ts 从 P3 起检查。检查的浏览器全局对象是 window、document、navigator、self、postMessage、requestAnimationFrame 和 cancelAnimationFrame；self 和 postMessage 只允许出现在 tracker.worker 中，tracker.ts 在 P3 把它们限定到默认依赖之前，可以在任何位置使用其他几个 |
 | OQ-74 | P2b 额外输入（测试） | 保留：在 P2-CF、P2-FT、P2-PIP、P2-WRK、P2-WKE 和 P2-OPT 各条款范围内补充的输入，清单见测试计划 |
 | OQ-75 | 流水线的组成 | 流水线用默认参数的 `createCornerFilter()` 做平滑，用 `createFocalTracker({ hfovDeg })` 追踪焦距：hfovDeg 取流水线的 `hfovDeg`，其他选项用默认值 |
+| OQ-76 | 追踪器的选项 | `analysisLongSide` 必须是正整数，`holdMs` 必须是 ≥ 0 的数（NaN 无效）；其他取值在发出第一条更新、调用 `getUserMedia` 之前就抛出 `RangeError` |
+| OQ-77 | 何时创建 worker | 拿到视频流时、调用 `play()` 之前创建 worker，让它的脚本在视频启动的同时加载；`stop()` 之后才到的流不再创建 worker |
+| OQ-78 | 无关的 error 回复 | id 不是在途帧的 `error` 回复和无关的 `result` 一样被忽略（OQ-45） |
+| OQ-79 | error 更新里的 fps | error 更新统计出错时刻之前 1000 ms 内收到的回复数，和 B8 对回复的统计方式相同 |
+| OQ-80 | 移动鼠标的提示（D14） | 只有当 hero 视口里既没有摄像头 AR 按钮、也没有 WebXR 按钮时，才显示“移动鼠标”的提示 |
+| OQ-81 | 重复关闭 | 用 ✕ 或 Esc 关闭后、`history.back()` 生效之前，再来的关闭请求（比如按住 Esc 不放）一律忽略 |
+| OQ-82 | 叠层里没有 WebGL | `createCameraScene` 抛错时，叠层保留摄像头画面和 HUD，只是没有 3D 层 |

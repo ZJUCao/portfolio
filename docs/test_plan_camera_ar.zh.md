@@ -1,6 +1,6 @@
 # 测试计划：标定板上的摄像头 AR
 
-状态：**已于 2026-11-02 确认**；P1 已转绿；P2a 测试已写好，先对骨架代码全部为红（本计划 §9），现已转绿，OQ-69–OQ-70 的补充用例也已通过；P2b 测试已写好，先对骨架代码为红，其中 P2-ARCH-01、02 已经通过（本计划 §9），现已转绿 · 设计文档：`docs/design_camera_ar.md`（已定细节见其 §14）· 英文版：`docs/test_plan_camera_ar.md`（以英文版为准，两版逐节同步）
+状态：**已于 2026-11-02 确认**；P1 已转绿；P2a 测试已写好，先对骨架代码全部为红（本计划 §9），现已转绿，OQ-69–OQ-70 的补充用例也已通过；P2b 测试已写好，先对骨架代码为红，其中 P2-ARCH-01、02 已经通过（本计划 §9），现已转绿；P3 测试已写好，先对骨架代码为红（本计划 §9），现已转绿 · 设计文档：`docs/design_camera_ar.md`（已定细节见其 §14）· 英文版：`docs/test_plan_camera_ar.md`（以英文版为准，两版逐节同步）
 
 本计划把设计文档的接口契约（§5，及 §6 的坐标约定、§9 的测试策略）按阶段（设计文档 §10）映射到测试用例。决策 D1–D14 均取方案 A。契约原先没有定义的 60 个问题都已定下（本计划 §10）：除 OQ-04、OQ-06、OQ-09、OQ-27、OQ-47 外均取方案 A。编写 P2a 测试时又提出了 OQ-61–OQ-68，评审时又提出了 OQ-69–OQ-70，编写 P2b 测试时提出了 OQ-71–OQ-75，均取方案 A。"§5.2" 这类编号指设计文档，"本计划 §x" 指本文档。
 
@@ -140,7 +140,7 @@ D1–D14 均取方案 A。
 | `recorder()` | 一个 `onUpdate`，保存每次更新并对其检查 P3-TRK-36 的不变量 |
 | `flush()` | 等待一个宏任务，让挂起的 promise 链执行完 |
 
-测试总是提供全部依赖，`startCameraAR` 只在某个依赖缺失时才解析它的默认实现（OQ-02）。
+测试总是提供全部依赖，`startCameraAR` 只在某个依赖缺失时才解析它的默认实现（OQ-02）。`rig()` 把每种替身各备一份、提供全部依赖；`replyPose`、`intrinsicsFor` 和 `captureByte` 生成可辨认的回复位姿、每帧的内参和采集字节；`takeViolations()` 汇总所有记录器发现的问题，由 `afterEach` 在每个用例里检查 P3-TRK-36 的不变量。
 
 ### 2.7 PDF 解析器（`tests/app/helpers/pdf.ts`，P4）
 
@@ -707,6 +707,21 @@ P2b 的 Red 检查，2026-11-03，针对 `src/ar/pipeline.ts` 的骨架代码（
 - 2026-11-03 落实 OQ-71–OQ-75：P2-PIP-11 只保留 hfov 50° 的运行，钳位作为 P2-PIP-10 的第二组脚本运行，所以用例仍是 61 个（P2 106 个，合计 238 个）；P2-CF-06、P2-PIP-07、P2-PIP-10、P2-PIP-11、P2-PIP-16、P2-PIP-22 和 P2-ARCH-01–02 的标题都注明了所依据的 OQ。重跑结果：仍是 59 个因 `Error: not implemented` 失败，两个 ARCH 用例通过；`npx vitest run` 131 个通过、59 个失败、8 个跳过；`npx tsc --noEmit` 和 `npx eslint tests` 无报错。参考实现仍能通过全部 61 个测试；缺少钳位的缺陷现在由 P2-FT-07、P2-FT-08 和 P2-PIP-10 发现。
 
 P2b 转绿，2026-11-03：`src/ar/pipeline.ts` 和 `src/ar/tracker.worker.ts` 实现后，61 个 P2b 测试全部通过；`npx vitest run` 190 个通过、8 个跳过；`npx tsc --noEmit` 和 `npx eslint` 无报错。M2-01（OQ-60）：在 `HeroViewport.tsx` 里临时加一处引用后，`next build` 把 worker 打包成一个 Turbopack 启动脚本加一个 19.7 KB 的 chunk（gzip 后 8 KB），其中是流水线、检测器和位姿代码，不含 `WebGLRenderer`，也不含 React；在浏览器面板中从 `out/` 加载时，worker 对一帧 64 × 36 的空白帧回复了 `result`（fx 55.43，缓冲区也传了回来）。之后已删除这处引用。M2-02：lint、tsc 和构建都无报错。
+
+P3 红灯检查，2026-11-04，针对 `src/ar/tracker.ts` 的骨架（类型齐全，`startCameraAR` 抛出 `new Error("not implemented")`）和尚未修改的 `heroScene.ts`：
+- `npx vitest run tests/ar/tracker.test.ts tests/ar/arch.test.ts tests/ar/helpers.test.ts`：41 个失败，没有一个是因为别的原因：39 个 P3-TRK 用例因 `Error: not implemented` 失败，P3-TRK-40 因为桩函数抛出的是 `Error` 而不是 `RangeError`，P3-ARCH-01 因为 `heroScene.ts` 还没有导入 `BOARD`。H-09 和 P2-ARCH-01–02 通过。从 P3 起，P2-ARCH-01 要求 tracker.ts 必须存在，P2-ARCH-02 只允许它在名为 `default…` 的顶层函数里使用浏览器全局对象（OQ-73）；`sourceScan.ts` 现在会记录每处全局对象所在的顶层声明。
+- `npx tsc --noEmit` 和 `npx eslint tests src/ar`：无报错。
+
+P3 转绿，2026-11-04：实现 `src/ar/tracker.ts`、让 `heroScene.ts` 的尺寸取自 `BOARD` 之后，41 个 P3 用例和 H-09 全部通过；`npx vitest run` 232 个通过、8 个跳过；`npx tsc --noEmit`、`npx eslint` 和 `next build` 都无报错。过程中修正了两处测试本身的错误，都不改动契约：P3-TRK-16 在帧缓冲区被转移、已经分离之后才读 `out.length`，现在替身在采集时就记下视图的长度和偏移；P3-TRK-27 里找到和没找到交替的回复始终落在 500 ms 的保持期内，永远看不到 searching，现在改用 `holdMs: 0` 运行。
+
+P3 手动检查，2026-11-04，在浏览器面板中打开本地托管的导出站点，把 `getUserMedia` 换成一块移动棋盘格画布的 `captureStream(30)`（M3-14）：
+- starting → searching → tracking，每秒约 26 个结果，横屏和 375 × 812 竖屏下角点标记都落在画出的角点上（M3-05、M3-09）；把标定板清空后约 0.5 s 内仍是 tracking，然后变为 searching，标定板回来后重新 tracking（M3-10）。
+- 按钮 push 了 `?ar=camera`；返回键、✕ 和 Esc 都能关闭叠层；直接打开链接时叠层立即出现，之后按 ✕ 只替换网址、不新增历史记录；`?ar=foo` 被忽略（M3-02）。叠层打开时 hero 的动画循环暂停，关闭后恢复；页面不能滚动；焦点移到关闭按钮，关闭后回到入口按钮（M3-03）。对话框挂在 `body` 下，带 `aria-modal` 和名称，Tab 只在叠层内循环（M3-08）。
+- denied（浏览器面板自己拦截摄像头，以及 SecurityError）、no-camera（NotFoundError、OverconstrainedError）、failed（NotReadableError）和 unsupported 都显示对应提示（M3-07）；中英文文案与 U6 一致（M3-06）。连续开关 10 次后没有残留的叠层、画布或未停止的轨道，也没有 WebGL 警告（M3-12）。
+- 构建产物中，追踪器和叠层在一个打开时才加载的 18 KB chunk 里；worker 的 chunk 不含 three.js 和 React；首页加载的脚本都不包含它们（M3-04）。
+- 发现并修复：按住 Esc 会关闭两次，留下一条多余的历史记录（OQ-81）。
+- 内容一直不变的画布流，以及隐藏的浏览器面板里的任何页面，都不会产出新的视频帧，追踪器因此停在 starting 或 searching；真实摄像头会持续出帧。
+- 尚待检查：M3-01（HTTPS、局域网地址和 WebXR 设备）、M3-11（减弱动态效果）、M3-13（XR 会话中），以及 M3-15–M3-19（真实设备和标定板）。
 
 ## 10. 已定问题
 

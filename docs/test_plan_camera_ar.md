@@ -1,6 +1,6 @@
 # Test plan: Camera AR on a calibration board
 
-Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included; P2b tests written, red against the skeleton with P2-ARCH-01 and 02 already passing (this plan §9), then green · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
+Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included; P2b tests written, red against the skeleton with P2-ARCH-01 and 02 already passing (this plan §9), then green; P3 tests written, red against the skeleton (this plan §9), then green · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
 
 This plan maps the contracts of the design (§5, with the conventions of §6 and the strategy of §9) to test cases, phase by phase (§10 of the design). Decisions D1–D14 are option A. The 60 questions the contract left open are resolved (this plan §10): option A for all except OQ-04, OQ-06, OQ-09, OQ-27 and OQ-47. OQ-61–OQ-68, raised while writing the P2a tests, OQ-69–OQ-70, raised in their review, and OQ-71–OQ-75, raised while writing the P2b tests, are all option A. Section numbers such as "§5.2" refer to the design; "this plan §x" refers to this document.
 
@@ -140,7 +140,7 @@ Note on mirroring: the 10×7 board's colouring is symmetric about its long axis,
 | `recorder()` | An `onUpdate` that stores every update and applies the invariants of P3-TRK-36 to it |
 | `flush()` | Awaits one macrotask so pending promise chains settle |
 
-Tests always pass every dependency, and `startCameraAR` resolves a default only when its dependency is missing (OQ-02).
+Tests always pass every dependency, and `startCameraAR` resolves a default only when its dependency is missing (OQ-02). `rig()` puts one of each fake together with every dependency supplied; `replyPose`, `intrinsicsFor` and `captureByte` give recognisable reply poses, per-frame intrinsics and capture bytes; `takeViolations()` collects what every recorder found, so an `afterEach` checks the invariants of P3-TRK-36 in every case.
 
 ### 2.7 PDF reader (`tests/app/helpers/pdf.ts`, P4)
 
@@ -707,6 +707,21 @@ P2b Red check, 2026-11-03, against the skeleton of `src/ar/pipeline.ts` (every f
 - OQ-71–OQ-75 applied on 2026-11-03: P2-PIP-11 keeps only the hfov-50° run, P2-PIP-10 takes the clamp as a second scripted run, so there are still 61 cases (P2 106, total 238), and the titles of P2-CF-06, P2-PIP-07, P2-PIP-10, P2-PIP-11, P2-PIP-16, P2-PIP-22 and P2-ARCH-01–02 cite the OQs they rely on. Rerun: the same 59 failures with `Error: not implemented` and the two passing ARCH cases; `npx vitest run` 131 passed, 59 failed, 8 skipped; `npx tsc --noEmit` and `npx eslint tests` clean. The reference still passes all 61; the missing clamp is now caught by P2-FT-07, P2-FT-08 and P2-PIP-10.
 
 P2b Green, 2026-11-03: all 61 P2b tests pass with `src/ar/pipeline.ts` and `src/ar/tracker.worker.ts` implemented; `npx vitest run` 190 passed and 8 skipped; `npx tsc --noEmit` and `npx eslint` clean. M2-01 (OQ-60): with a temporary reference in `HeroViewport.tsx`, `next build` emits the worker as a Turbopack bootstrap plus one 19.7 KB chunk (8 KB gzipped) holding the pipeline, detector and pose, with no `WebGLRenderer` and no React in it; served from `out/` in the browser pane, the worker answered a blank 64 × 36 frame with a `result` (fx 55.43, the buffer returned). The reference was then removed. M2-02: lint, tsc and build clean.
+
+P3 Red check, 2026-11-04, against the skeleton of `src/ar/tracker.ts` (types complete, `startCameraAR` throws `new Error("not implemented")`) and the unchanged `heroScene.ts`:
+- `npx vitest run tests/ar/tracker.test.ts tests/ar/arch.test.ts tests/ar/helpers.test.ts`: 41 fail, none for another reason: 39 P3-TRK cases with `Error: not implemented`, P3-TRK-40 because the stub throws an `Error` rather than a `RangeError`, and P3-ARCH-01 because `heroScene.ts` does not import `BOARD` yet. H-09 and P2-ARCH-01–02 pass. From P3, P2-ARCH-01 requires tracker.ts and P2-ARCH-02 allows its browser globals only inside the top-level functions named `default…` (OQ-73); `sourceScan.ts` now records the top-level declaration each global use sits in.
+- `npx tsc --noEmit` and `npx eslint tests src/ar`: clean.
+
+P3 Green, 2026-11-04: with `src/ar/tracker.ts` implemented and `heroScene.ts` taking its sizes from `BOARD`, all 41 P3 cases and H-09 pass; `npx vitest run` 232 passed and 8 skipped; `npx tsc --noEmit`, `npx eslint` and `next build` clean. Two test mistakes were fixed on the way, neither a contract change: P3-TRK-16 read `out.length` after the posted buffer was detached, so the fake now records the view's length and offset at capture time; and the found/not-found mix of P3-TRK-27 stayed inside the 500 ms hold, so it never produced a searching update, and now runs with `holdMs: 0`.
+
+P3 manual checks, 2026-11-04, in the browser pane on the exported site served locally, with `getUserMedia` replaced by a canvas `captureStream(30)` of a moving board (M3-14):
+- starting → searching → tracking at about 26 results per second, corner markers on the drawn corners in landscape and in 375 × 812 portrait (M3-05, M3-09); with the board blanked, tracking for ≈ 0.5 s, then searching, and tracking again once it returns (M3-10).
+- The button pushes `?ar=camera`; Back, ✕ and Esc close the overlay; a direct load opens it at once, and ✕ then replaces the URL without a new history entry; `?ar=foo` is ignored (M3-02). The hero loop pauses while open and resumes after; the page does not scroll; focus moves to Close and back to the button (M3-03). The dialog sits in `body` with `aria-modal` and its name, and Tab stays inside (M3-08).
+- Messages for denied (the pane's own camera block, and SecurityError), no-camera (NotFoundError, OverconstrainedError), failed (NotReadableError) and unsupported (M3-07); zh and en copy as in U6 (M3-06). Ten open/close cycles leave no overlay, canvas or live track and no WebGL warning (M3-12).
+- In the build the tracker and the overlay sit in an 18 KB chunk loaded on opening; the worker chunk has no three.js or React; no script the home page loads contains either (M3-04).
+- Found and fixed: a held Esc key closed twice and left a stray history entry (OQ-81).
+- A canvas stream whose content never changes, or any page in a hidden browser pane, delivers no new video frames, so the tracker waits in starting or searching; real cameras keep delivering frames.
+- Still to do: M3-01 over HTTPS, a LAN URL and a WebXR device; M3-11 reduced motion; M3-13 with an XR session; M3-15–M3-19 on devices and real boards.
 
 ## 10. Resolved questions
 

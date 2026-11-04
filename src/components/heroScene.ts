@@ -1,19 +1,22 @@
 // 首页的 3D 场景，仿照 SceneGraph-AR 的画面：棋盘格标定板上立着一座场景图城堡，
 // 板上标出 OpenCV 找到的 9×6 个内角点（每行一种颜色连起来，和 drawChessboardCorners 画的一样）和坐标轴。
 // 镜头绕着慢慢转，鼠标移动时视角跟着偏一点，像头部追踪。支持 WebXR 的设备上可以把它放进 AR / VR 里看。
-// 只由 HeroViewport 按需加载，three.js 不进其他页面的代码。
+// 摄像头 AR 的画面 createCameraScene 也在这里，和首页共用同一套城堡和标注。
+// 只由 HeroViewport 和 CameraAR 按需加载，three.js 不进其他页面的代码。
 
 import * as THREE from "three";
+import { BOARD } from "@/ar/board";
 
 export type XRMode = "immersive-ar" | "immersive-vr";
 // 每秒报几次：帧率，以及相机相对标定板中心的位置（米）和朝向（度）
 export type Stats = { fps: number; x: number; y: number; z: number; yaw: number };
 
-// 10×7 个格子、9×6 个内角点，和项目里用的标定板一样；一格当作 25 毫米，用来把位置换算成米
-const COLS = 10;
-const ROWS = 7;
-const SQUARE = 0.24;
-const METERS_PER_UNIT = 0.025 / SQUARE;
+// 10×7 个格子、9×6 个内角点，和摄像头 AR 识别的标定板是同一份尺寸（src/ar/board.ts）；
+// 一格打印出来是 25 毫米，用来把位置换算成米
+const COLS = BOARD.squaresX;
+const ROWS = BOARD.squaresY;
+const SQUARE = BOARD.squareSize;
+const METERS_PER_UNIT = BOARD.squareMeters / BOARD.squareSize;
 
 const CAMERA = { radius: 4.7, height: 3, target: new THREE.Vector3(0, 0.3, 0) };
 
@@ -22,28 +25,15 @@ export function createHeroScene(
   { reducedMotion, onStats }: { reducedMotion: boolean; onStats: (stats: Stats) => void },
 ) {
   // 不支持 WebGL 时这里会抛错，由调用方接住，页面保留静态的底图
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  const renderer = createRenderer(container);
   renderer.xr.enabled = true;
-  renderer.domElement.style.width = "100%";
-  renderer.domElement.style.height = "100%";
-  container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 60);
   // 标定板、城堡等都放在 world 里，进 XR 时整体缩小、挪到用户面前
   const world = new THREE.Group();
   scene.add(world);
-
-  scene.add(new THREE.HemisphereLight("#bcd7ff", "#1a1030", 1.4));
-  const sun = new THREE.DirectionalLight("#ffffff", 2.4);
-  sun.position.set(3, 5, 2);
-  scene.add(sun);
-  // 背后一道青色的光，给城堡描一圈亮边
-  const rim = new THREE.DirectionalLight("#5fe3ff", 1.6);
-  rim.position.set(-3, 2, -4);
-  scene.add(rim);
+  addLights(scene);
 
   world.add(board(renderer), corners(), axes(), blobShadow(), castle());
   const ring = scanRing();
@@ -138,11 +128,17 @@ export function createHeroScene(
     }
   }
 
-  // 画面滚出视口时停下来，不白耗电；「减少动态效果」时只画静止的一帧
+  // 画面滚出视口、或者摄像头 AR 盖在上面（paused）时停下来，不白耗电；「减少动态效果」时只画静止的一帧。
+  // 正在 XR 里时照常画
   let visible = true;
+  let paused = false;
   const updateLoop = () => {
-    const animate = renderer.xr.isPresenting || (visible && !reducedMotion);
+    const animate = renderer.xr.isPresenting || (visible && !paused && !reducedMotion);
     renderer.setAnimationLoop(animate ? frame : null);
+  };
+  const setPaused = (value: boolean) => {
+    paused = value;
+    updateLoop();
   };
   const observer = new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting;
@@ -184,20 +180,102 @@ export function createHeroScene(
     container.removeEventListener("pointermove", onPointerMove);
     container.removeEventListener("pointerleave", onPointerLeave);
     renderer.xr.getSession()?.end();
-    scene.traverse((object) => {
-      if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points) {
-        object.geometry.dispose();
-        for (const material of [object.material].flat()) {
-          (material as THREE.MeshBasicMaterial).map?.dispose();
-          material.dispose();
-        }
-      }
-    });
-    renderer.dispose();
-    renderer.domElement.remove();
+    disposeAll(scene, renderer);
   }
 
-  return { enterXR, dispose };
+  return { enterXR, setPaused, dispose };
+}
+
+// 摄像头 AR 的画面：一块透明画布叠在摄像头画面上，城堡、角点连线、坐标轴、影子和扫描环都和首页一样，
+// 但没有虚拟的标定板、光点、地面网格，不跟鼠标，也没有 WebXR。相机直接用 pose.ts 从真实标定板算出的
+// 视图矩阵和投影矩阵（列主序），找不到标定板时（view 为 null）整个场景隐藏。挂载期间一直在画
+export function createCameraScene(container: HTMLElement, { reducedMotion }: { reducedMotion: boolean }) {
+  const renderer = createRenderer(container);
+  const scene = new THREE.Scene();
+  addLights(scene);
+  const world = new THREE.Group();
+  world.visible = false;
+  world.add(corners(), axes(), blobShadow(), castle());
+  const ring = scanRing();
+  world.add(ring);
+  scene.add(world);
+
+  // 位置和投影都由 setPose 直接给，three.js 不再按 position 和 fov 去算
+  const camera = new THREE.PerspectiveCamera();
+  camera.matrixAutoUpdate = false;
+
+  const resize = () => {
+    const { clientWidth: w, clientHeight: h } = container;
+    if (w && h) renderer.setSize(w, h, false);
+  };
+  const resizer = new ResizeObserver(resize);
+  resizer.observe(container);
+  resize();
+
+  const timer = new THREE.Timer();
+  renderer.setAnimationLoop(() => {
+    timer.update();
+    if (!reducedMotion) animateRing(ring, timer.getElapsed());
+    renderer.render(scene, camera);
+  });
+
+  function setPose(view: ArrayLike<number> | null, projection: ArrayLike<number> | null) {
+    if (!view || !projection) {
+      world.visible = false;
+      return;
+    }
+    // view 把场景坐标换到相机坐标，相机自己在场景里的变换是它的逆
+    camera.matrix.fromArray(Array.from(view)).invert();
+    camera.matrixWorldNeedsUpdate = true;
+    camera.projectionMatrix.fromArray(Array.from(projection));
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    world.visible = true;
+  }
+
+  function dispose() {
+    renderer.setAnimationLoop(null);
+    resizer.disconnect();
+    disposeAll(scene, renderer);
+  }
+
+  return { setPose, dispose };
+}
+
+// 透明背景的画布，铺满容器。像素比最多 2，手机上不白画太多像素
+function createRenderer(container: HTMLElement) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.domElement.style.width = "100%";
+  renderer.domElement.style.height = "100%";
+  container.appendChild(renderer.domElement);
+  return renderer;
+}
+
+function addLights(scene: THREE.Scene) {
+  scene.add(new THREE.HemisphereLight("#bcd7ff", "#1a1030", 1.4));
+  const sun = new THREE.DirectionalLight("#ffffff", 2.4);
+  sun.position.set(3, 5, 2);
+  scene.add(sun);
+  // 背后一道青色的光，给城堡描一圈亮边
+  const rim = new THREE.DirectionalLight("#5fe3ff", 1.6);
+  rim.position.set(-3, 2, -4);
+  scene.add(rim);
+}
+
+// 释放显存里的几何体、材质和贴图，再移走画布
+function disposeAll(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
+  scene.traverse((object) => {
+    if (object instanceof THREE.Mesh || object instanceof THREE.Line || object instanceof THREE.Points) {
+      object.geometry.dispose();
+      for (const material of [object.material].flat()) {
+        (material as THREE.MeshBasicMaterial).map?.dispose();
+        material.dispose();
+      }
+    }
+  });
+  renderer.dispose();
+  renderer.domElement.remove();
 }
 
 // 棋盘格标定板，四周留一圈白边，和打印出来的一样
