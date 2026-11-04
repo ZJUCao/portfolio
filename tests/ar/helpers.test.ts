@@ -1,9 +1,11 @@
 // Helper self-tests (docs/test_plan_camera_ar.md §2.9). These must pass before any contract test
 // is trusted: they check the random numbers, the renderer's pixel convention and accuracy, the
-// ground truth, the nominal-condition verdict and the scene catalogue.
+// ground truth, the nominal-condition verdict, the scene catalogue and, from P3, the camera fakes.
 
 import { describe, expect, it } from "vitest";
+import type { WorkerResponse } from "@/ar/pipeline";
 import { STANDARD_BOARD, cornerGrid } from "./helpers/boardModel";
+import { FakeWorker, ManualScheduler } from "./helpers/cameraFakes";
 import { checkCatalog, stressScenes } from "./helpers/catalog";
 import { apply3 } from "./helpers/linalg";
 import { crossAtCorner0, outwardSquareContrast } from "./helpers/metrics";
@@ -208,6 +210,40 @@ describe("helper self-tests (§2.9)", () => {
     expect(Math.abs(std / 3 - 1)).toBeLessThan(0.03);
     expect(render(options).image.data).toEqual(a);
     expect(render({ ...options, seed: 6 }).image.data).not.toEqual(a);
+  });
+
+  it("H-09 camera fakes detach posted buffers, reply in new buffers and run only pending frame callbacks", () => {
+    const worker = new FakeWorker();
+    let reply: WorkerResponse | null = null;
+    worker.onmessage = (event) => (reply = event.data);
+    const buffer = new ArrayBuffer(16);
+    worker.postMessage({ type: "frame", id: 1, width: 2, height: 2, buffer, time: 0 }, [buffer]);
+    expect(buffer.byteLength, "detached after postMessage").toBe(0);
+    const received = worker.frames[0];
+    expect(received.buffer.byteLength).toBe(16);
+    worker.respond();
+    const result = reply as WorkerResponse | null;
+    expect(result?.type).toBe("result");
+    const returned = (result as Extract<WorkerResponse, { type: "result" }>).buffer;
+    expect(returned).not.toBe(received.buffer);
+    expect(returned.byteLength).toBe(16);
+    expect(received.buffer.byteLength, "the worker's copy is transferred back").toBe(0);
+    expect(worker.deliveredBuffers).toEqual([returned]);
+
+    const scheduler = new ManualScheduler();
+    const log: string[] = [];
+    scheduler.request(() => {
+      log.push("a");
+      scheduler.request(() => log.push("c"));
+    });
+    const cancel = scheduler.request(() => log.push("b"));
+    cancel();
+    scheduler.tick();
+    expect(log, "a callback requested during a tick waits; a cancelled one never runs").toEqual(["a"]);
+    expect(scheduler.pending).toBe(1);
+    scheduler.tick();
+    expect(log).toEqual(["a", "c"]);
+    expect(scheduler.pending).toBe(0);
   });
 
   it("H-11 every catalogue scene is what its test needs", () => {

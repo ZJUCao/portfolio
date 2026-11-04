@@ -1,6 +1,6 @@
 # Design: Camera AR on a calibration board
 
-Status: **Confirmed 2026-11-02**, P1 and P2 done, P3 next · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
+Status: **Confirmed 2026-11-02**, P1, P2 and P3 done, P4 next · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
 
 ## 1. Goal
 
@@ -471,12 +471,12 @@ About 2,350 changed source lines in 11 files (P1 and P2 as built, P3 and P4 esti
 - [x] P1 Detector: green on 2026-11-02 (84 passed, 8 photo cases skipped until fixtures exist); reviewed and committed as `b98e03c` on `claude/camera-ar`
 - [x] P2a Pose: green on 2026-11-02 (45 pose tests pass; full suite 129 passed, 8 skipped); reviewed and committed on `claude/camera-ar`
 - [x] P2b Worker pipeline: green on 2026-11-03 (61 P2b tests pass; full suite 190 passed, 8 skipped); worker bundling checked (OQ-60); reviewed and committed on `claude/camera-ar`
-- [ ] P3 Camera AR overlay
+- [x] P3 Camera AR overlay: green on 2026-11-04 (41 P3 tests and H-09 pass; full suite 232 passed, 8 skipped); lint, tsc and build clean; checked in the browser pane with a canvas stream standing in for the camera (test plan §9); still to check: M3-01, M3-11, M3-13 and the devices and boards of M3-15–M3-19; awaiting review on `claude/camera-ar-p3`
 - [ ] P4 Board view, QR, PDF
 
 ## 14. Resolved details
 
-Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day; OQ-71–OQ-75 were raised while writing the P2b tests and resolved on 2026-11-03. Each line is part of the contract.
+Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day; OQ-71–OQ-75 were raised while writing the P2b tests and resolved on 2026-11-03. OQ-76–OQ-82 were settled while implementing P3 on 2026-11-04 and are up for confirmation in its review. Each line is part of the contract.
 
 | # | Area | Resolution |
 | :--- | :--- | :--- |
@@ -555,3 +555,10 @@ Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised wh
 | OQ-73 | Architecture scan (test) | Modules not listed in §4 fail; board, chessboard, pose, pipeline and tracker.worker must exist, tracker.ts is checked from P3. The browser globals checked are window, document, navigator, self, postMessage, requestAnimationFrame and cancelAnimationFrame; self and postMessage are allowed only in tracker.worker, and tracker.ts may use the others anywhere until P3 limits them to its defaults |
 | OQ-74 | Extra P2b inputs (test) | Kept: the inputs added within the clauses of P2-CF, P2-FT, P2-PIP, P2-WRK, P2-WKE and P2-OPT, listed in the test plan |
 | OQ-75 | Pipeline components | The pipeline smooths with `createCornerFilter()` at its default parameters and tracks the focal length with `createFocalTracker({ hfovDeg })`, the pipeline's `hfovDeg` and the other options at their defaults |
+| OQ-76 | Tracker options | `analysisLongSide` must be a positive integer and `holdMs` a number ≥ 0 (NaN is invalid); anything else throws `RangeError` before the first update and before `getUserMedia` |
+| OQ-77 | Worker creation | The worker is created when the stream arrives, before `play()`, so its script loads while the video starts; a stream arriving after `stop()` creates none |
+| OQ-78 | Stray error replies | An `error` reply whose id is not the frame in flight is ignored, like a stray `result` (OQ-45) |
+| OQ-79 | fps in error updates | An error update counts the replies of the last 1000 ms at the time of the error, as B8 does for replies |
+| OQ-80 | Pointer hint (D14) | The "move the pointer" hint shows only when the hero viewport has neither a camera AR nor a WebXR button |
+| OQ-81 | Closing twice | While a close by ✕ or Esc waits for its `history.back()`, further close requests (a held Esc key) are ignored |
+| OQ-82 | No WebGL in the overlay | When `createCameraScene` throws, the overlay keeps the camera view and the HUD without the 3D layer |
