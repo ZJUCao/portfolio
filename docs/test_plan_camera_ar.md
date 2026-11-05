@@ -1,6 +1,6 @@
 # Test plan: Camera AR on a calibration board
 
-Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included; P2b tests written, red against the skeleton with P2-ARCH-01 and 02 already passing (this plan §9), then green; P3 tests written, red against the skeleton (this plan §9), then green · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
+Status: **Confirmed on 2026-11-02**; P1 green; P2a tests written, red against the skeleton (this plan §9), then green, the OQ-69–OQ-70 addendum included; P2b tests written, red against the skeleton with P2-ARCH-01 and 02 already passing (this plan §9), then green; P3 tests written, red against the skeleton (this plan §9), then green; P4 tests written, red against the skeleton (this plan §9), then green · Design: `docs/design_camera_ar.md` (resolved details in its §14) · Chinese version: `docs/test_plan_camera_ar.zh.md` (kept in sync section by section)
 
 This plan maps the contracts of the design (§5, with the conventions of §6 and the strategy of §9) to test cases, phase by phase (§10 of the design). Decisions D1–D14 are option A. The 60 questions the contract left open are resolved (this plan §10): option A for all except OQ-04, OQ-06, OQ-09, OQ-27 and OQ-47. OQ-61–OQ-68, raised while writing the P2a tests, OQ-69–OQ-70, raised in their review, and OQ-71–OQ-75, raised while writing the P2b tests, are all option A. Section numbers such as "§5.2" refer to the design; "this plan §x" refers to this document.
 
@@ -722,6 +722,19 @@ P3 manual checks, 2026-11-04, in the browser pane on the exported site served lo
 - Found and fixed: a held Esc key closed twice and left a stray history entry (OQ-81).
 - A canvas stream whose content never changes, or any page in a hidden browser pane, delivers no new video frames, so the tracker waits in starting or searching; real cameras keep delivering frames.
 - Still to do: M3-01 over HTTPS, a LAN URL and a WebXR device; M3-11 reduced motion; M3-13 with an XR session; M3-15–M3-19 on devices and real boards.
+
+P4 Red check, 2026-11-04, against the skeleton of `src/app/chessboard.pdf/route.ts` (`dynamic` set, `GET` throws `new Error("not implemented")`):
+- `npx vitest run tests/app tests/ar/helpers.test.ts`: 15 of the 16 P4-PDF cases fail with `Error: not implemented`, none for another reason; P4-PDF-01 passes, since the skeleton already exports `dynamic`. H-10 passes: the reader parses a hand-written PDF 1.4 with an unfiltered and a FlateDecode content stream, interprets its fills, colours, CTM and text, and refuses a copy whose object 3 offset is one byte off.
+- `npx tsc --noEmit` and `npx eslint tests`: clean.
+
+P4 Green, 2026-11-04: with the route implemented, all 16 P4-PDF cases and H-10 pass; `npx vitest run` 249 passed and 8 skipped; `npx tsc --noEmit`, `npx eslint` and `next build` clean, and the build exports `out/chessboard.pdf` (2,139 bytes). Rendered from the exported file with the test reader, the page shows the board centred with square (0, 0) dark at the top left, the caption at the lower left and the 50 mm label and bar at the lower right; by Helvetica's widths the caption ends at 476 pt and the label spans 600–627 pt, 6 pt left of the bar.
+
+P4 manual checks, 2026-11-04, in the browser pane on the exported site served locally:
+- On a desktop (no coarse pointer) the button pushes `?ar=board` (M4-01). The board view shows 35 dark squares with square (0, 0) top left in a white margin of half a square, the QR code beside it and the caption "Scan with your phone and point it at this screen"; the QR matrix in the page equals `uqr`'s encoding of `http://localhost:4173/en?ar=camera` (M4-05). A wake lock is requested on opening (M4-04).
+- "Use this device's camera" replaces the parameter with `camera` and tracks (M4-06); the camera view offers "Show board" and "Print board (PDF)", a link to `/chessboard.pdf` (M4-03); "Show board" replaces it back and the camera's tracks end; with getUserMedia rejected, the error offers "Show the board instead" (M4-02). Back closes the overlay in one step from either view, focus returns to the button, and every wake lock is released (OQ-59).
+- In the 375 × 812 mobile preset (coarse pointer) the button pushes `?ar=camera`; a direct load of `?ar=board` opens the board view without a QR code and with the caption 「用另一台设备的摄像头对准这块屏幕」, and Esc then replaces the URL (M4-01, M4-05). In portrait the board is as wide as the screen (OQ-88).
+- The browser pane downloads `/chessboard.pdf` instead of showing it, so the PDF was checked through the reader as above.
+- Still to do: M4-07 printing at 100 % on A4 and measuring, M4-04 the wake lock past a real screen timeout, M4-08 the hand-off from a desktop to an iPhone, and M4-09 on a preview deployment.
 
 ## 10. Resolved questions
 

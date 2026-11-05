@@ -2,7 +2,7 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-My bilingual portfolio site, live at [portfolio-troy-0de3.vercel.app](https://portfolio-troy-0de3.vercel.app). It is a static Next.js export: every page is generated at build time, the projects come straight from my public GitHub repositories, and the home page runs a live three.js scene with WebXR and a camera AR demo that tracks a printed chessboard in the browser.
+My bilingual portfolio site, live at [yu-cao.vercel.app](https://yu-cao.vercel.app). It is a static Next.js export: every page is generated at build time, the projects come straight from my public GitHub repositories, and the home page runs a live three.js scene with WebXR and a camera AR demo that tracks a printed chessboard in the browser.
 
 ## Features
 
@@ -10,7 +10,7 @@ My bilingual portfolio site, live at [portfolio-troy-0de3.vercel.app](https://po
 - **Projects synced from GitHub.** Before each build, `scripts/fetch-github.mjs` fetches my public, non-fork repositories with their languages, topics, READMEs in each language and declared dependencies. Projects are sorted into categories and their tech stacks are recognised automatically. A GitHub Action redeploys the site every day, so a new repository shows up within a day.
 - **Project pages.** Each project gets a page with its README (Mermaid diagrams included), language breakdown, tech stack, topics, stats and an optional demo video (YouTube on the English page, Bilibili on the Chinese page). Cards use a cover image from the README, or a line drawing for the category.
 - **Live 3D hero.** A three.js scene modelled on my SceneGraph AR project: a castle on a calibration board with OpenCV-style corner markers, a camera that follows the pointer, and an FPS and pose readout. On WebXR devices (Quest, Vision Pro) it can be opened in AR or VR.
-- **Camera AR.** "Try camera AR" opens a full-screen view of the device camera and puts the castle on a real 10×7 chessboard. Corner detection, planar pose and focal-length estimation are written from scratch in TypeScript and run in a Web Worker. No OpenCV.js is involved.
+- **Camera AR.** "Try camera AR" opens a full-screen view of the device camera and puts the castle on a real 10×7 chessboard. Corner detection, planar pose and focal-length estimation are written from scratch in TypeScript and run in a Web Worker. No OpenCV.js is involved. On a desktop it first shows the board on screen with a QR code: scan it with a phone and point the phone at the screen. The board can also be printed from a PDF.
 - **About, contact and privacy pages**, a bilingual 404 page, and share images generated at build time (`/og.png`, `/apple-touch-icon.png`).
 - **Accessibility.** Skip link, visible focus, keyboard-only navigation, and motion that follows the system's "reduce motion" setting.
 
@@ -94,7 +94,9 @@ flowchart LR
 
 The detector, pose solver and pipeline do not depend on the DOM, so they run in the worker and in Node tests. The overlay and its code load only when it is opened. The open state is kept in the URL (`?ar=camera`), so the Back button closes it and a link can open it directly.
 
-The feature is built in four phases. Phases 1–3 are done: the detector, the pose and worker pipeline, and the camera overlay. Phase 4 adds an on-screen board, a QR code that hands off from desktop to phone, and a printable PDF board. Until then, print any 10×7-square chessboard with 25 mm squares. The design, with its interface contracts, and the test plan are in `docs/` ([design](docs/design_camera_ar.md), [test plan](docs/test_plan_camera_ar.md)).
+The overlay has two views, kept in the URL as `?ar=camera` and `?ar=board`. The board view shows the 10×7 board with a white margin and keeps the screen awake. On a desktop it also shows a QR code that opens the camera view on a phone. `/chessboard.pdf` is generated at build time: one A4 landscape page with 25 mm squares and a 50 mm scale bar for checking the print scale.
+
+The feature was built in four phases: the detector, the pose and worker pipeline, the camera overlay, and the board view with the QR code and the PDF. The design, with its interface contracts, and the test plan are in `docs/` ([design](docs/design_camera_ar.md), [test plan](docs/test_plan_camera_ar.md)).
 
 ## Deployment
 
