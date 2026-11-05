@@ -330,8 +330,8 @@ function corners() {
   group.add(
     new THREE.Points(
       geometry.clone(),
-      // 圆圈大小随透视缩放，手机上的小画面里不会显得太大
-      new THREE.PointsMaterial({ ...overlay, vertexColors: true, map: ringSprite(), size: 0.18 }),
+      // 圆圈大小随透视缩放，手机上的小画面里不会显得太大；圈小一点、淡一点，不抢城堡的风头
+      new THREE.PointsMaterial({ ...overlay, vertexColors: true, map: ringSprite(), size: 0.1, opacity: 0.7 }),
     ),
   );
   group.traverse((object) => (object.renderOrder = OVERLAY_ORDER));
