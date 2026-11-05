@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import type { CameraARLabels } from "@/components/CameraAR";
+import type { ARView, CameraARLabels } from "@/components/CameraAR";
 import { floorPath } from "@/components/CoverArt";
 import { HudCorners } from "@/components/HudCorners";
 import type { XRMode } from "@/components/heroScene";
@@ -21,7 +21,8 @@ export type HudLabels = {
 // 摄像头 AR 的叠层连同追踪、位姿的代码，打开时才下载
 const CameraAR = dynamic(() => import("@/components/CameraAR"), { ssr: false });
 
-// 叠层开着没有，记在网址的 ?ar=camera 里：按返回键能关掉，带这个参数的链接打开就直接进摄像头（D6）。
+// 叠层开着没有、开的是哪个画面，记在网址的 ?ar=camera 或 ?ar=board 里：按返回键能关掉，
+// 带这个参数的链接打开就直接进去（D6），其他取值不理会（OQ-58）。
 // 自己 pushState / replaceState 不会触发 popstate，所以改了网址要手动通知
 const arListeners = new Set<() => void>();
 function subscribeAr(listener: () => void) {
@@ -32,10 +33,13 @@ function subscribeAr(listener: () => void) {
     window.removeEventListener("popstate", listener);
   };
 }
-const arInUrl = () => new URLSearchParams(window.location.search).get("ar") === "camera";
-function setArInUrl(open: boolean, push: boolean) {
+const arViewInUrl = (): ARView | null => {
+  const value = new URLSearchParams(window.location.search).get("ar");
+  return value === "camera" || value === "board" ? value : null;
+};
+function setArInUrl(view: ARView | null, push: boolean) {
   const url = new URL(window.location.href);
-  if (open) url.searchParams.set("ar", "camera");
+  if (view) url.searchParams.set("ar", view);
   else url.searchParams.delete("ar");
   if (push) window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
@@ -62,7 +66,8 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
   const wasOpen = useRef(false);
   const [ready, setReady] = useState(false);
   const [xrModes, setXrModes] = useState<XRMode[]>([]);
-  const arOpen = useSyncExternalStore(subscribeAr, arInUrl, () => false);
+  const arView = useSyncExternalStore(subscribeAr, arViewInUrl, () => null);
+  const arOpen = arView !== null;
   const canUseCamera = useSyncExternalStore(noSubscription, cameraAvailable, () => false);
 
   useEffect(() => {
@@ -86,8 +91,8 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
         dispose = scene.dispose;
         enterXR.current = scene.enterXR;
         setPaused.current = scene.setPaused;
-        // 带着 ?ar=camera 打开页面时，叠层比首页画面先出现
-        scene.setPaused(arInUrl());
+        // 带着 ?ar= 打开页面时，叠层比首页画面先出现
+        scene.setPaused(arViewInUrl() !== null);
         setReady(true);
       })
       .catch((error) => console.warn("Could not start the 3D scene, keeping the static backdrop:", error));
@@ -119,20 +124,24 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
   const start = (mode: XRMode) =>
     enterXR.current?.(mode).catch((error) => console.warn("Could not start the XR session:", error));
 
+  // 桌面端（没有触屏）先显示标定板和二维码，让人用手机扫；手机和平板直接打开摄像头（D5）
   const openCameraAR = () => {
     pushedAR.current = true;
-    setArInUrl(true, true);
+    setArInUrl(matchMedia("(any-pointer: coarse)").matches ? "camera" : "board", true);
   };
+
+  // 在叠层里换画面只替换网址参数，按返回键仍然一次就关掉叠层（U12）
+  const switchView = useCallback((view: ARView) => setArInUrl(view, false), []);
 
   // history.back() 要等 popstate 才生效，期间再按 Esc（比如按住不放）不能再改一次网址
   const closeCameraAR = useCallback(() => {
-    if (!arInUrl() || closing.current) return;
+    if (arViewInUrl() === null || closing.current) return;
     if (pushedAR.current) {
       pushedAR.current = false;
       closing.current = true;
       window.history.back();
     } else {
-      setArInUrl(false, false);
+      setArInUrl(null, false);
     }
   }, []);
 
@@ -196,7 +205,9 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
         )}
       </div>
 
-      {arOpen && <CameraAR labels={labels.cameraAR} onClose={closeCameraAR} />}
+      {arView && (
+        <CameraAR view={arView} labels={labels.cameraAR} canUseCamera={canUseCamera} onClose={closeCameraAR} onView={switchView} />
+      )}
     </div>
   );
 }

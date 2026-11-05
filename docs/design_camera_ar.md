@@ -1,6 +1,6 @@
 # Design: Camera AR on a calibration board
 
-Status: **Confirmed 2026-11-02**, P1, P2 and P3 done, P4 next · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
+Status: **Confirmed 2026-11-02**, P1–P4 done · Tier: Full · Phases: P1–P4, with P2 in two batches (§10)
 
 ## 1. Goal
 
@@ -446,7 +446,7 @@ About 2,350 changed source lines in 11 files (P1 and P2 as built, P3 and P4 esti
 ## 11. Assumptions
 
 - Vitest 4.1.12 in the `node` environment, with `vite` 8.3.4 and `jpeg-js` as dev dependencies. Vitest 5 needs `@types/node` ≥ 22 and the project keeps 20. The `@` alias is set in `vitest.config.mts` rather than through `vite-tsconfig-paths`. No jsdom or Testing Library, since there are no component tests.
-- QR codes come from `uqr` (MIT, no dependencies, renders SVG), loaded with the board view.
+- QR codes come from `uqr` (MIT, no dependencies; 0.1.3 as installed), bundled with the overlay. Its `encode` gives the module matrix, which the board view draws as one SVG path.
 - No lens distortion model; the principal point is the image centre.
 - Analysis frames have a 640 px long side; the camera is asked for 1280 × 720.
 - URL parameter `ar` with the values `camera` and `board`.
@@ -472,11 +472,11 @@ About 2,350 changed source lines in 11 files (P1 and P2 as built, P3 and P4 esti
 - [x] P2a Pose: green on 2026-11-02 (45 pose tests pass; full suite 129 passed, 8 skipped); reviewed and committed on `claude/camera-ar`
 - [x] P2b Worker pipeline: green on 2026-11-03 (61 P2b tests pass; full suite 190 passed, 8 skipped); worker bundling checked (OQ-60); reviewed and committed on `claude/camera-ar`
 - [x] P3 Camera AR overlay: green on 2026-11-04 (41 P3 tests and H-09 pass; full suite 232 passed, 8 skipped); lint, tsc and build clean; checked in the browser pane with a canvas stream standing in for the camera (test plan §9); still to check: M3-01, M3-11, M3-13 and the devices and boards of M3-15–M3-19; awaiting review on `claude/camera-ar-p3`
-- [ ] P4 Board view, QR, PDF
+- [x] P4 Board view, QR, PDF: green on 2026-11-04 (16 P4 tests and H-10 pass; full suite 249 passed, 8 skipped); lint, tsc and build clean, with `out/chessboard.pdf` exported; checked in the browser pane (test plan §9); still to check: printing (M4-07), the wake lock on a device (M4-04) and the phone hand-off (M4-08); awaiting review on `camera-ar-p4`
 
 ## 14. Resolved details
 
-Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day; OQ-71–OQ-75 were raised while writing the P2b tests and resolved on 2026-11-03. OQ-76–OQ-82 were settled while implementing P3 on 2026-11-04 and are up for confirmation in its review. Each line is part of the contract.
+Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised while writing the P2a tests and OQ-69–OQ-70 in its review, all resolved the same day; OQ-71–OQ-75 were raised while writing the P2b tests and resolved on 2026-11-03. OQ-76–OQ-82 were settled while implementing P3 on 2026-11-04, and OQ-83–OQ-89 while implementing P4 the same day; both groups are up for confirmation in review. Each line is part of the contract.
 
 | # | Area | Resolution |
 | :--- | :--- | :--- |
@@ -562,3 +562,10 @@ Raised by the test plan and resolved on 2026-11-02; OQ-61–OQ-68 were raised wh
 | OQ-80 | Pointer hint (D14) | The "move the pointer" hint shows only when the hero viewport has neither a camera AR nor a WebXR button |
 | OQ-81 | Closing twice | While a close by ✕ or Esc waits for its `history.back()`, further close requests (a held Esc key) are ignored |
 | OQ-82 | No WebGL in the overlay | When `createCameraScene` throws, the overlay keeps the camera view and the HUD without the 3D layer |
+| OQ-83 | PDF board size | `chessboard.pdf` takes the square count and size from `BOARD`, so the printed board cannot drift from the one the detector expects; §4 had listed the route as knowing nothing else |
+| OQ-84 | PDF layout | Caption in 9 pt Helvetica at the board's left edge and a dark grey (0.3 g) scale bar right-aligned with the board, both on a baseline 26 pt above the page bottom; the bar is grey so that the 35 squares stay the only black fills (P4-PDF-08) |
+| OQ-85 | Switching views | "Show board", "Show the board instead" and "Use this device's camera" all replace the URL parameter, so Back closes the overlay in one step from either view |
+| OQ-86 | QR code | ECC level M with a 4-module quiet zone; it encodes the origin, the first path segment (the language) and `?ar=camera` |
+| OQ-87 | Wake lock | Requested when the board view opens and again whenever the page becomes visible while it is shown; a refused request is ignored |
+| OQ-88 | Board in portrait | The board keeps its orientation (square (0, 0) top left, U10), so in portrait it is as wide as the screen and no larger |
+| OQ-89 | Error state | Every error, insecure and unsupported included, offers "Show the board instead"; while the error panel shows, the camera view hides its Show board and Print buttons |

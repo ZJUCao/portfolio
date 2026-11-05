@@ -2,8 +2,10 @@
 // is trusted: they check the random numbers, the renderer's pixel convention and accuracy, the
 // ground truth, the nominal-condition verdict, the scene catalogue and, from P3, the camera fakes.
 
+import { deflateSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import type { WorkerResponse } from "@/ar/pipeline";
+import { type PdfStream, type PdfValue, bounds, decodeStream, interpretContent, isArray, isDict, isName, isStream, readPdf } from "../app/helpers/pdf";
 import { STANDARD_BOARD, cornerGrid } from "./helpers/boardModel";
 import { FakeWorker, ManualScheduler } from "./helpers/cameraFakes";
 import { checkCatalog, stressScenes } from "./helpers/catalog";
@@ -244,6 +246,57 @@ describe("helper self-tests (§2.9)", () => {
     scheduler.tick();
     expect(log).toEqual(["a", "c"]);
     expect(scheduler.pending).toBe(0);
+  });
+
+  it("H-10 the PDF reader parses a hand-written PDF 1.4 and rejects a wrong cross-reference offset", () => {
+    const content = "q 0 g 10 20 30 40 re f Q 0.5 g 1 0 0 1 100 0 cm 0 0 m 10 0 l 10 10 l h f BT /F1 12 Tf 5 6 Td (Hi \\(x\\) \\267) Tj ET";
+    const flate = deflateSync(Buffer.from("0 0 1 rg 1 1 2 2 re f", "latin1"));
+    const parts = [
+      "%PDF-1.4\n",
+      "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n",
+      "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 /MediaBox [0 0 842 595] >>\nendobj\n",
+      "3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents [4 0 R 5 0 R] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>\nendobj\n",
+      `4 0 obj\n<< /Length ${content.length} >>\nstream\n${content}\nendstream\nendobj\n`,
+      `5 0 obj\n<< /Length ${flate.length} /Filter /FlateDecode >>\nstream\n${flate.toString("latin1")}\nendstream\nendobj\n`,
+    ];
+    const offsets: number[] = [];
+    let offset = 0;
+    for (const part of parts) {
+      offsets.push(offset);
+      offset += Buffer.byteLength(part, "latin1");
+    }
+    const build = (shift: number) => {
+      const xref = ["xref\n0 6\n", "0000000000 65535 f \n", ...offsets.slice(1).map((o, k) => `${String(o + (k === 2 ? shift : 0)).padStart(10, "0")} 00000 n \n`)];
+      return new Uint8Array(Buffer.from(`${parts.join("")}${xref.join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${offset}\n%%EOF\n`, "latin1"));
+    };
+
+    const pdf = readPdf(build(0));
+    expect(pdf.version).toBe("1.4");
+    expect(pdf.xref[0].entries).toHaveLength(6);
+    const catalog = pdf.resolve(pdf.trailer.entries.Root);
+    expect(isDict(catalog) && isName(catalog.entries.Type) && catalog.entries.Type.value).toBe("Catalog");
+    const page = pdf.object(3);
+    const contents = isDict(page) ? pdf.resolve(page.entries.Contents) : undefined;
+    expect(isArray(contents)).toBe(true);
+    const streams = (contents as { items: PdfValue[] }).items.map((item) => pdf.resolve(item));
+    expect(streams.every(isStream)).toBe(true);
+    const decoded = streams.map((s) => Buffer.from(decodeStream(s as PdfStream)).toString("latin1"));
+    expect(decoded).toEqual([content, "0 0 1 rg 1 1 2 2 re f"]);
+    const ops = interpretContent(new Uint8Array(Buffer.from(decoded.join(" "), "latin1")));
+    expect(ops.fills.map((f) => [f.colour.space, f.colour.components, bounds(f.points)])).toEqual([
+      ["gray", [0], { x0: 10, y0: 20, x1: 40, y1: 60 }],
+      ["gray", [0.5], { x0: 100, y0: 0, x1: 110, y1: 10 }],
+      ["rgb", [0, 0, 1], { x0: 101, y0: 1, x1: 103, y1: 3 }],
+    ]);
+    expect(ops.texts).toHaveLength(1);
+    expect(ops.texts[0]).toMatchObject({ font: "F1", size: 12, x: 105, y: 6, text: "Hi (x) ·" });
+    // /Root, /Pages, /Kids, /Parent and the two /Contents entries
+    expect(pdf.references().length).toBe(6);
+
+    // Object 3's offset one byte off: reading it fails
+    const broken = readPdf(build(1));
+    expect(() => broken.object(3)).toThrow(/does not hold/);
+    expect(() => broken.references()).toThrow();
   });
 
   it("H-11 every catalogue scene is what its test needs", () => {
