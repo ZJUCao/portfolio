@@ -1,14 +1,17 @@
 "use client";
 
 import { X } from "@phosphor-icons/react/ssr";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { encode } from "uqr";
 import { BOARD } from "@/ar/board";
 import { cameraPosition, projectionMatrix, viewMatrix } from "@/ar/pose";
 import { type CameraError, type TrackingStatus, type VideoLike, startCameraAR } from "@/ar/tracker";
+import { CutLayer } from "@/components/CutLayer";
 import { HudCorners } from "@/components/HudCorners";
 import { createCameraScene } from "@/components/heroScene";
+import type { Cut, CutTarget, Phase } from "@/cut/engine";
+import { type Pt, toClipPath } from "@/cut/geometry";
 
 /** 叠层的两个画面，和网址里 ?ar= 的值一样 */
 export type ARView = "camera" | "board";
@@ -31,6 +34,8 @@ export type CameraARLabels = {
   pointCaption: string;
   boardLabel: string;
   qrLabel: string;
+  // 停在切口窗口时的提示：点里面进去，点外面合上
+  peekHint: string;
 };
 
 type Props = {
@@ -41,7 +46,16 @@ type Props = {
   onClose: () => void;
   // 换到另一个画面，网址里的参数跟着换（U12）
   onView: (view: ARView) => void;
+  // 从这一点（按钮中心，视口坐标）切开空间、停在窗口（docs/design_space_cut.md §6.2）；
+  // 没有时（比如直接打开带 ?ar= 的链接）叠层照旧整个出现
+  cutFrom?: Pt | null;
+  // 叠层是不是已经盖满屏幕：切口停在窗口时首页还看得见，3D 画面不能停
+  onCover?: (covered: boolean) => void;
 };
+
+// 叠层整个藏起来时的 clip-path：一个没有面积的多边形
+const HIDDEN = "polygon(0px 0px, 0px 0px, 0px 0px)";
+const NO_TOOLS = { knife: false, wand: false, click: false };
 
 // 场景单位（一格 0.24）的近远裁剪面：手机离板子几厘米到几米都画得出来
 const NEAR = 0.05;
@@ -66,9 +80,42 @@ const primaryButton =
 // 标定板，让另一台设备的摄像头对准它，桌面端旁边有打开摄像头 AR 的二维码。
 // 由 HeroViewport 在打开时才加载，所以追踪、位姿、three.js 和二维码都不进首页的代码。
 // Reveal 会给首页内容加 transform，fixed 定位会相对它，所以叠层用 portal 挂到 body 上
-export default function CameraAR({ view, labels, canUseCamera, onClose, onView }: Props) {
+export default function CameraAR({ view, labels, canUseCamera, onClose, onView, cutFrom = null, onCover }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const worldRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const cutRef = useRef<Cut | null>(null);
+  const [phase, setPhase] = useState<Phase>("idle");
+  const [covered, setCovered] = useState(cutFrom === null);
+  // 要切开时，叠层从第一帧起就是藏着的，免得先整个闪一下
+  const [initialStyle] = useState<CSSProperties | undefined>(() => (cutFrom ? { clipPath: HIDDEN } : undefined));
+
+  // 切口的目标就是叠层本身：窗口形状写进 clip-path，视差移动里面的画面，减少动态效果时改透明度
+  const target = useMemo<CutTarget>(
+    () => ({
+      setWindow(polygon) {
+        const dialog = dialogRef.current;
+        if (dialog) dialog.style.clipPath = polygon === null ? "" : polygon.length ? toClipPath(polygon) : HIDDEN;
+      },
+      setParallax(dx, dy, scale, origin) {
+        const world = worldRef.current;
+        if (!world) return;
+        const still = dx === 0 && dy === 0 && scale === 1;
+        world.style.transformOrigin = still ? "" : `${origin[0]}px ${origin[1]}px`;
+        world.style.transform = still ? "" : `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(${scale.toFixed(4)})`;
+      },
+      setFade(opacity) {
+        const dialog = dialogRef.current;
+        if (dialog) dialog.style.opacity = opacity >= 1 ? "" : String(opacity);
+      },
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    onCover?.(covered);
+    return () => onCover?.(false);
+  }, [covered, onCover]);
 
   // 页面不能滚动
   useEffect(() => {
@@ -85,9 +132,20 @@ export default function CameraAR({ view, labels, canUseCamera, onClose, onView }
     closeRef.current?.focus();
   }, [view]);
 
-  // Esc 关闭；Tab 只在叠层里转
+  // Esc 关闭；Tab 只在叠层里转。切口进行中时：停在窗口按 Enter 穿过去、按 Esc 合上（D8），
+  // Enter 不能落到有焦点的关闭按钮上
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      const cut = cutRef.current;
+      const cutPhase = cut?.phase ?? "idle";
+      if (cut && cutPhase !== "idle" && (event.key === "Enter" || event.key === "Escape")) {
+        event.preventDefault();
+        if (cutPhase === "peek") {
+          if (event.key === "Enter") cut.stepThrough();
+          else cut.close();
+        } else if (event.key === "Escape" && cutPhase !== "closing") onClose();
+        return;
+      }
       if (event.key === "Escape") {
         event.preventDefault();
         onClose();
@@ -105,34 +163,76 @@ export default function CameraAR({ view, labels, canUseCamera, onClose, onView }
   }, [onClose]);
 
   return createPortal(
-    <div
-      ref={dialogRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label={labels.title}
-      className="fixed inset-0 z-50 overflow-hidden bg-black text-foreground"
-    >
-      {view === "camera" ? (
-        <CameraView labels={labels} onClose={onClose} onShowBoard={() => onView("board")} />
-      ) : (
-        <BoardView labels={labels} canUseCamera={canUseCamera} onUseCamera={() => onView("camera")} />
-      )}
-      <button
-        ref={closeRef}
-        type="button"
-        onClick={onClose}
-        aria-label={labels.close}
-        className="panel absolute right-6 top-6 flex size-10 items-center justify-center rounded-full bg-surface/70 backdrop-blur transition-colors hover:bg-raised active:scale-[0.98] sm:right-8"
+    <div className="fixed inset-0 z-50">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={labels.title}
+        style={initialStyle}
+        className="absolute inset-0 overflow-hidden bg-black text-foreground"
       >
-        <X aria-hidden size={20} />
-      </button>
+        <div ref={worldRef} className="absolute inset-0">
+          {view === "camera" ? (
+            <CameraView labels={labels} labelAt={covered ? null : cutFrom} onClose={onClose} onShowBoard={() => onView("board")} />
+          ) : (
+            <BoardView labels={labels} canUseCamera={canUseCamera} onUseCamera={() => onView("camera")} />
+          )}
+        </div>
+        <button
+          ref={closeRef}
+          type="button"
+          onClick={onClose}
+          aria-label={labels.close}
+          className="panel absolute right-6 top-6 flex size-10 items-center justify-center rounded-full bg-surface/70 backdrop-blur transition-colors hover:bg-raised active:scale-[0.98] sm:right-8"
+        >
+          <X aria-hidden size={20} />
+        </button>
+      </div>
+      {/* 从按钮处切开、停在窗口：点窗里或按 Enter 穿过去，点窗外或按 Esc 合上并关掉叠层 */}
+      {cutFrom && (
+        <CutLayer
+          target={target}
+          stop
+          tools={NO_TOOLS}
+          onReady={(cut) => {
+            cutRef.current = cut;
+            cut.clickAt(cutFrom);
+          }}
+          onResize={(cut) => {
+            // 窗口尺寸变了：不再停在半路，直接整个打开
+            cut.reset();
+            target.setWindow(null);
+            setCovered(true);
+          }}
+          onPhase={setPhase}
+          onThrough={() => setCovered(true)}
+          onClose={onClose}
+        />
+      )}
+      {phase === "peek" && (
+        <p role="status" className="pointer-events-none absolute inset-x-4 bottom-8 flex justify-center text-center text-sm">
+          <span className="rounded-full bg-black/70 px-3 py-2 backdrop-blur">{labels.peekHint}</span>
+        </p>
+      )}
     </div>,
     document.body,
   );
 }
 
-// 摄像头画面：打开摄像头、追踪标定板，把城堡画在板子上。离开这个画面时摄像头就关掉
-function CameraView({ labels, onClose, onShowBoard }: { labels: CameraARLabels; onClose: () => void; onShowBoard: () => void }) {
+// 摄像头画面：打开摄像头、追踪标定板，把城堡画在板子上。离开这个画面时摄像头就关掉。
+// 摄像头出画面之前，"正在打开摄像头"写在切口窗口的中间（labelAt），穿过去之后写在屏幕中间；画面到了再淡入（Q9）
+function CameraView({
+  labels,
+  labelAt,
+  onClose,
+  onShowBoard,
+}: {
+  labels: CameraARLabels;
+  labelAt: Pt | null;
+  onClose: () => void;
+  onShowBoard: () => void;
+}) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const fpsRef = useRef<HTMLSpanElement>(null);
@@ -182,9 +282,24 @@ function CameraView({ labels, onClose, onShowBoard }: { labels: CameraARLabels; 
   return (
     <>
       {/* 不镜像：前置摄像头也照原样显示（D2）。画面和 3D 画布用同样的 cover 方式铺满 */}
-      <video ref={videoRef} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />
+      <video
+        ref={videoRef}
+        playsInline
+        muted
+        autoPlay
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${status === "starting" ? "opacity-0" : "opacity-100"}`}
+      />
       <div ref={sceneRef} aria-hidden className="pointer-events-none absolute inset-0" />
       <HudCorners className="inset-4" />
+      {status === "starting" && error === null && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 whitespace-nowrap text-sm text-muted motion-safe:animate-pulse"
+          style={labelAt ? { left: labelAt[0], top: labelAt[1] } : { left: "50%", top: "50%" }}
+        >
+          {labels.starting}
+        </span>
+      )}
 
       {/* 右边留出关闭按钮的位置 */}
       <div className="absolute inset-x-6 top-6 flex items-start justify-between gap-4 pr-14 text-xs sm:inset-x-8">

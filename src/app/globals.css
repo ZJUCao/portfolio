@@ -188,3 +188,28 @@ dd {
 .readme .js-render-enrichment-loader {
   display: none;
 }
+
+/* 空间切口（docs/design_space_cut.md §6.1、§12.1）：切换语言时旧页面原样留着当底，
+   新页面只由切口的 clip-path 露出来，不做浏览器默认的淡入淡出 */
+html:active-view-transition-type(cut)::view-transition-old(root),
+html:active-view-transition-type(cut)::view-transition-new(root) {
+  animation: none;
+}
+
+/* 减少动态效果时不切，只淡入淡出 200 ms */
+html:active-view-transition-type(cut-fade)::view-transition-old(root),
+html:active-view-transition-type(cut-fade)::view-transition-new(root) {
+  animation-duration: 200ms;
+}
+
+/* 画切口边缘的效果层在过渡期间是实时的：旧快照不要，新的那份盖在新页面上面 */
+::view-transition-old(cut-fx) {
+  display: none;
+}
+::view-transition-group(cut-fx),
+::view-transition-new(cut-fx) {
+  animation: none;
+}
+::view-transition-group(cut-fx) {
+  z-index: 10;
+}

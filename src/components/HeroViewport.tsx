@@ -1,11 +1,12 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type MouseEvent, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ARView, CameraARLabels } from "@/components/CameraAR";
 import { floorPath } from "@/components/CoverArt";
 import { HudCorners } from "@/components/HudCorners";
 import type { XRMode } from "@/components/heroScene";
+import type { Pt } from "@/cut/geometry";
 
 export type HudLabels = {
   scene: string;
@@ -69,6 +70,10 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
   const arView = useSyncExternalStore(subscribeAr, arViewInUrl, () => null);
   const arOpen = arView !== null;
   const canUseCamera = useSyncExternalStore(noSubscription, cameraAvailable, () => false);
+  // 叠层从按钮中心切开（docs/design_space_cut.md §6.2）；直接打开带 ?ar= 的链接时没有切口
+  const [cutFrom, setCutFrom] = useState<Pt | null>(null);
+  // 叠层盖满屏幕之前首页还看得见，3D 画面照常转
+  const [covered, setCovered] = useState(false);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -113,9 +118,13 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
     };
   }, []);
 
-  // 叠层盖住首页时首页画面停下来；关掉后焦点回到入口按钮，没有按钮时回到取景框
+  // 叠层盖满首页时首页画面停下来
   useEffect(() => {
-    setPaused.current?.(arOpen);
+    setPaused.current?.(arOpen && covered);
+  }, [arOpen, covered]);
+
+  // 关掉后焦点回到入口按钮，没有按钮时回到取景框
+  useEffect(() => {
     if (!arOpen) closing.current = false;
     if (wasOpen.current && !arOpen) (cameraButtonRef.current ?? viewportRef.current)?.focus();
     wasOpen.current = arOpen;
@@ -125,7 +134,9 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
     enterXR.current?.(mode).catch((error) => console.warn("Could not start the XR session:", error));
 
   // 桌面端（没有触屏）先显示标定板和二维码，让人用手机扫；手机和平板直接打开摄像头（D5）
-  const openCameraAR = () => {
+  const openCameraAR = (event: MouseEvent<HTMLButtonElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    setCutFrom([box.left + box.width / 2, box.top + box.height / 2]);
     pushedAR.current = true;
     setArInUrl(matchMedia("(any-pointer: coarse)").matches ? "camera" : "board", true);
   };
@@ -206,7 +217,15 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
       </div>
 
       {arView && (
-        <CameraAR view={arView} labels={labels.cameraAR} canUseCamera={canUseCamera} onClose={closeCameraAR} onView={switchView} />
+        <CameraAR
+          view={arView}
+          labels={labels.cameraAR}
+          canUseCamera={canUseCamera}
+          onClose={closeCameraAR}
+          onView={switchView}
+          cutFrom={cutFrom}
+          onCover={setCovered}
+        />
       )}
     </div>
   );
