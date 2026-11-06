@@ -22,10 +22,19 @@ const CAMERA = { radius: 4.7, height: 3, target: new THREE.Vector3(0, 0.3, 0) };
 
 export function createHeroScene(
   container: HTMLElement,
-  { reducedMotion, onStats }: { reducedMotion: boolean; onStats: (stats: Stats) => void },
+  {
+    reducedMotion,
+    onStats,
+    pointerTarget = container,
+  }: {
+    reducedMotion: boolean;
+    onStats: (stats: Stats) => void;
+    // 镜头跟随的指针事件从哪个元素上听：切口的那一层盖在画布上面，所以由调用方给出外层的取景框
+    pointerTarget?: HTMLElement;
+  },
 ) {
-  // 不支持 WebGL 时这里会抛错，由调用方接住，页面保留静态的底图
-  const renderer = createRenderer(container);
+  // 不支持 WebGL 时这里会抛错，由调用方接住，页面保留静态的底图。彩蛋的传送门要用模板缓冲
+  const renderer = createRenderer(container, true);
   renderer.xr.enabled = true;
 
   const scene = new THREE.Scene();
@@ -35,7 +44,9 @@ export function createHeroScene(
   scene.add(world);
   addLights(scene);
 
-  world.add(board(renderer), corners(), axes(), blobShadow(), castle());
+  const boardMesh = board(renderer);
+  const castleGroup = castle();
+  world.add(boardMesh, corners(), axes(), blobShadow(), castleGroup);
   const ring = scanRing();
   world.add(ring);
   const dust = particles();
@@ -46,22 +57,27 @@ export function createHeroScene(
   floor.visible = false;
   scene.add(floor);
 
-  // 鼠标在画面上的位置（-1 到 1），镜头朝它偏过去
+  // 彩蛋的传送门：工程视角里画标定板和城堡的每一块（docs/design_space_cut.md §6.4）
+  const portal = createPortal(renderer, scene, container, [boardMesh, ...castleGroup.children.filter((c): c is THREE.Mesh => c instanceof THREE.Mesh)]);
+
+  // 鼠标在画面上的位置（-1 到 1），镜头朝它偏过去。划线和化开期间不跟（setFollow）
   const pointer = { x: 0, y: 0 };
   const look = { x: 0, y: 0 };
+  let following = true;
   const onPointerMove = (event: PointerEvent) => {
-    if (event.pointerType !== "mouse") return;
+    if (event.pointerType !== "mouse" || !following) return;
     const box = container.getBoundingClientRect();
     pointer.x = ((event.clientX - box.left) / box.width) * 2 - 1;
     pointer.y = ((event.clientY - box.top) / box.height) * 2 - 1;
   };
   const onPointerLeave = () => {
+    if (!following) return;
     pointer.x = 0;
     pointer.y = 0;
   };
   if (!reducedMotion) {
-    container.addEventListener("pointermove", onPointerMove);
-    container.addEventListener("pointerleave", onPointerLeave);
+    pointerTarget.addEventListener("pointermove", onPointerMove);
+    pointerTarget.addEventListener("pointerleave", onPointerLeave);
   }
 
   const resize = () => {
@@ -101,7 +117,7 @@ export function createHeroScene(
       );
       camera.lookAt(CAMERA.target);
     }
-    renderer.render(scene, camera);
+    portal.draw(camera);
   }
 
   const report = (fps: number) => {
@@ -132,9 +148,14 @@ export function createHeroScene(
   // 正在 XR 里时照常画
   let visible = true;
   let paused = false;
+  let looping = false;
   const updateLoop = () => {
-    const animate = renderer.xr.isPresenting || (visible && !paused && !reducedMotion);
-    renderer.setAnimationLoop(animate ? frame : null);
+    looping = renderer.xr.isPresenting || (visible && !paused && !reducedMotion);
+    renderer.setAnimationLoop(looping ? frame : null);
+  };
+  // 不在逐帧画的时候（减少动态效果），传送门变了也要补画一帧
+  const redraw = () => {
+    if (!looping) render(0, timer.getElapsed());
   };
   const setPaused = (value: boolean) => {
     paused = value;
@@ -177,13 +198,205 @@ export function createHeroScene(
     renderer.setAnimationLoop(null);
     observer.disconnect();
     resizer.disconnect();
-    container.removeEventListener("pointermove", onPointerMove);
-    container.removeEventListener("pointerleave", onPointerLeave);
+    pointerTarget.removeEventListener("pointermove", onPointerMove);
+    pointerTarget.removeEventListener("pointerleave", onPointerLeave);
     renderer.xr.getSession()?.end();
+    portal.dispose();
     disposeAll(scene, renderer);
   }
 
-  return { enterXR, setPaused, dispose };
+  return {
+    enterXR,
+    setPaused,
+    dispose,
+    /** 切口的窗口（取景框里的 px）：[] 没有窗口，null 窗口铺满 */
+    setPortal(polygon: PortalPolygon | null) {
+      portal.setWindow(polygon);
+      redraw();
+    },
+    /** 穿过去以后对调：窗外换成刚才窗里的画面 */
+    swapViews() {
+      portal.swap();
+      redraw();
+    },
+    isEngineering: () => portal.engineering,
+    setFollow(value: boolean) {
+      following = value;
+    },
+  };
+}
+
+// ---- 彩蛋的传送门（docs/design_space_cut.md §3 D3、§6.4、§12.1） ----
+
+type PortalPolygon = readonly (readonly [number, number])[];
+type View = "normal" | "engineering";
+// 工程视角里要画的零件额外放在这一层，画工程视角时相机只看这一层
+const ENGINEERING_LAYER = 1;
+// 工程视角的底色：深一点的图纸蓝，一眼能和普通画面分开
+const ENGINEERING_BG = new THREE.Color("#06111c");
+// 窗口多边形最多这么多个点（透镜 82 个，魔杖的洞 96 个）
+const MASK_POINTS = 512;
+
+// 先照常画一种画面；有窗口时把窗口画进模板缓冲（同时铺上另一种画面的底色），清掉深度，
+// 再只在模板值为 1 的地方画另一种画面。工程视角是法线着色加线框，外加每个零件的包围盒和局部坐标轴
+function createPortal(renderer: THREE.WebGLRenderer, scene: THREE.Scene, container: HTMLElement, parts: THREE.Mesh[]) {
+  for (const part of parts) part.layers.enable(ENGINEERING_LAYER);
+
+  const sceneMaterials = new Set<THREE.Material>();
+  scene.traverse((object) => {
+    const material = (object as THREE.Mesh).material;
+    if (material) for (const m of [material].flat()) sceneMaterials.add(m);
+  });
+
+  const normalMaterial = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide });
+  const wireMaterial = new THREE.MeshBasicMaterial({ color: "#cfefff", wireframe: true, transparent: true, opacity: 0.3, toneMapped: false });
+  const helpers = new THREE.Scene();
+  const grid = new THREE.GridHelper(6, 24, "#2a6a8f", "#123049");
+  const boxes = parts.map((part) => new THREE.BoxHelper(part, "#fbbf6a"));
+  const axes = parts.map(() => {
+    const helper = new THREE.AxesHelper(0.22);
+    helper.matrixAutoUpdate = false;
+    return helper;
+  });
+  helpers.add(grid, ...boxes, ...axes);
+  const engineeringMaterials = [normalMaterial, wireMaterial, ...[grid, ...boxes, ...axes].flatMap((h) => [h.material].flat())];
+
+  // 窗口：正交相机放在 z = 0.5，免得 z = 0 的遮罩落在近平面上被裁掉（§12.1）
+  const ortho = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  ortho.position.z = 0.5;
+  const positions = new Float32Array(MASK_POINTS * 9);
+  const maskGeometry = new THREE.BufferGeometry();
+  maskGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  const maskMaterial = new THREE.MeshBasicMaterial({
+    depthTest: false,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    blending: THREE.NoBlending,
+    transparent: true,
+    toneMapped: false,
+    stencilWrite: true,
+    stencilRef: 1,
+    stencilFunc: THREE.AlwaysStencilFunc,
+    stencilZPass: THREE.ReplaceStencilOp,
+  });
+  const mask = new THREE.Mesh(maskGeometry, maskMaterial);
+  mask.frustumCulled = false;
+  const maskScene = new THREE.Scene();
+  maskScene.add(mask);
+
+  let base: View = "normal";
+  let mode: "none" | "full" | "window" = "none";
+  let polygon: PortalPolygon = [];
+
+  const stencil = (materials: Iterable<THREE.Material>, on: boolean) => {
+    for (const m of materials) {
+      m.stencilWrite = on;
+      m.stencilRef = 1;
+      m.stencilFunc = THREE.EqualStencilFunc;
+      m.stencilZPass = THREE.KeepStencilOp;
+    }
+  };
+
+  // 窗口多边形换成归一化设备坐标，以中心为顶点扇形三角化（透镜和洞都是围着中心的星形）
+  function setMask(points: PortalPolygon) {
+    const w = container.clientWidth || 1;
+    const h = container.clientHeight || 1;
+    const n = Math.min(points.length, MASK_POINTS);
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < n; i++) {
+      cx += points[i][0];
+      cy += points[i][1];
+    }
+    cx /= n;
+    cy /= n;
+    const nx = (x: number) => (x / w) * 2 - 1;
+    const ny = (y: number) => 1 - (y / h) * 2;
+    for (let i = 0; i < n; i++) {
+      const a = points[i];
+      const b = points[(i + 1) % n];
+      positions.set([nx(cx), ny(cy), 0, nx(a[0]), ny(a[1]), 0, nx(b[0]), ny(b[1]), 0], i * 9);
+    }
+    maskGeometry.setDrawRange(0, n * 3);
+    maskGeometry.attributes.position.needsUpdate = true;
+  }
+
+  function drawView(view: View, camera: THREE.Camera, inWindow: boolean) {
+    if (view === "normal") {
+      if (inWindow) stencil(sceneMaterials, true);
+      renderer.render(scene, camera);
+      if (inWindow) stencil(sceneMaterials, false);
+      return;
+    }
+    stencil(engineeringMaterials, inWindow);
+    const layers = camera.layers.mask;
+    camera.layers.set(ENGINEERING_LAYER);
+    scene.overrideMaterial = normalMaterial;
+    renderer.render(scene, camera);
+    scene.overrideMaterial = wireMaterial;
+    renderer.render(scene, camera);
+    scene.overrideMaterial = null;
+    camera.layers.mask = layers;
+    boxes.forEach((box) => box.update());
+    axes.forEach((helper, i) => {
+      helper.matrix.copy(parts[i].matrixWorld);
+      helper.matrixWorldNeedsUpdate = true;
+    });
+    renderer.render(helpers, camera);
+  }
+
+  function draw(camera: THREE.Camera) {
+    // 没有窗口、也没对调过，或者在 XR 里：和原来一样画一遍
+    if (renderer.xr.isPresenting || (mode === "none" && base === "normal")) {
+      renderer.autoClear = true;
+      renderer.render(scene, camera);
+      return;
+    }
+    renderer.autoClear = false;
+    renderer.setClearColor(0x000000, 0);
+    renderer.clear();
+    const other: View = base === "normal" ? "engineering" : "normal";
+    const shown = mode === "full" ? other : base;
+    if (shown === "engineering") {
+      renderer.setClearColor(ENGINEERING_BG, 1);
+      renderer.clear(true, false, false);
+      renderer.setClearColor(0x000000, 0);
+    }
+    drawView(shown, camera, false);
+    if (mode !== "window" || polygon.length < 3) return;
+    setMask(polygon);
+    // 窗里先铺另一种画面的底色：工程视角是图纸蓝，普通画面是透明（露出后面的网格）
+    maskMaterial.color.copy(other === "engineering" ? ENGINEERING_BG : new THREE.Color(0x000000));
+    maskMaterial.opacity = other === "engineering" ? 1 : 0;
+    renderer.render(maskScene, ortho);
+    renderer.clearDepth();
+    drawView(other, camera, true);
+  }
+
+  return {
+    draw,
+    setWindow(next: PortalPolygon | null) {
+      if (next === null) mode = "full";
+      else if (next.length === 0) mode = "none";
+      else {
+        mode = "window";
+        polygon = next;
+      }
+    },
+    swap() {
+      base = base === "normal" ? "engineering" : "normal";
+      mode = "none";
+    },
+    get engineering() {
+      return base === "engineering";
+    },
+    dispose() {
+      for (const material of engineeringMaterials) material.dispose();
+      for (const helper of [grid, ...boxes, ...axes]) helper.geometry.dispose();
+      maskGeometry.dispose();
+      maskMaterial.dispose();
+    },
+  };
 }
 
 // 摄像头 AR 的画面：一块透明画布叠在摄像头画面上，城堡、角点连线、坐标轴、影子和扫描环都和首页一样，
@@ -241,9 +454,9 @@ export function createCameraScene(container: HTMLElement, { reducedMotion }: { r
   return { setPose, dispose };
 }
 
-// 透明背景的画布，铺满容器。像素比最多 2，手机上不白画太多像素
-function createRenderer(container: HTMLElement) {
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+// 透明背景的画布，铺满容器。像素比最多 2，手机上不白画太多像素。three.js 默认不要模板缓冲，传送门要时打开
+function createRenderer(container: HTMLElement, stencil = false) {
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, stencil });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.domElement.style.width = "100%";
