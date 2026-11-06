@@ -1,11 +1,13 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { type MouseEvent, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type KeyboardEvent, type MouseEvent, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ARView, CameraARLabels } from "@/components/CameraAR";
 import { floorPath } from "@/components/CoverArt";
+import type { CutHints } from "@/components/CutLayer";
 import { HudCorners } from "@/components/HudCorners";
-import type { XRMode } from "@/components/heroScene";
+import type { createHeroScene, XRMode } from "@/components/heroScene";
+import type { Cut, CutTarget, Phase } from "@/cut/engine";
 import type { Pt } from "@/cut/geometry";
 
 export type HudLabels = {
@@ -17,10 +19,15 @@ export type HudLabels = {
   vr: string;
   camera: string;
   cameraAR: CameraARLabels;
+  // 彩蛋：在取景框里切开空间，看场景的工程视角（docs/design_space_cut.md §6.4）
+  cut: Required<CutHints> & { engineering: string; aria: string };
 };
 
 // 摄像头 AR 的叠层连同追踪、位姿的代码，打开时才下载
 const CameraAR = dynamic(() => import("@/components/CameraAR"), { ssr: false });
+// 彩蛋的切口层连同切口引擎，3D 画面准备好以后才下载，不进首页首屏的代码
+const CutLayer = dynamic(() => import("@/components/CutLayer").then((m) => m.CutLayer), { ssr: false });
+const EGG_TOOLS = { knife: true, wand: true, click: false };
 
 // 叠层开着没有、开的是哪个画面，记在网址的 ?ar=camera 或 ?ar=board 里：按返回键能关掉，
 // 带这个参数的链接打开就直接进去（D6），其他取值不理会（OQ-58）。
@@ -74,6 +81,11 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
   const [cutFrom, setCutFrom] = useState<Pt | null>(null);
   // 叠层盖满屏幕之前首页还看得见，3D 画面照常转
   const [covered, setCovered] = useState(false);
+  // 彩蛋：3D 场景的接口、切口引擎，以及现在窗外是不是工程视角（穿过去以后两种画面对调）
+  const sceneRef = useRef<ReturnType<typeof createHeroScene> | null>(null);
+  const cutRef = useRef<Cut | null>(null);
+  const [engineering, setEngineering] = useState(false);
+  const portal = useMemo<CutTarget>(() => ({ setWindow: (polygon) => sceneRef.current?.setPortal(polygon) }), []);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -85,6 +97,8 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
         if (cancelled) return;
         const scene = createHeroScene(mount, {
           reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+          // 切口层盖在画布上面，镜头跟随的指针事件从整个取景框上听
+          pointerTarget: viewportRef.current ?? mount,
           // 每秒几次，直接改文字，不经过 React 重新渲染
           onStats: ({ fps, x, y, z, yaw }) => {
             if (fpsRef.current) fpsRef.current.textContent = fps ? `${fps} FPS` : "— FPS";
@@ -93,7 +107,11 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
             }
           },
         });
-        dispose = scene.dispose;
+        sceneRef.current = scene;
+        dispose = () => {
+          sceneRef.current = null;
+          scene.dispose();
+        };
         enterXR.current = scene.enterXR;
         setPaused.current = scene.setPaused;
         // 带着 ?ar= 打开页面时，叠层比首页画面先出现
@@ -156,14 +174,48 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
     }
   }, []);
 
+  // 彩蛋的键盘操作（D8）：取景框有焦点时，Enter 或空格在中间开窗并停住，再按 Enter 穿过去，Esc 合上；
+  // 已经在工程视角里时，Esc 直接回到普通画面（OQ-4）。焦点在里面的按钮上（或叠层里）时不管
+  const onViewportKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    const cut = cutRef.current;
+    if (event.target !== event.currentTarget || !cut || !["Enter", " ", "Escape"].includes(event.key)) return;
+    if (event.key === "Escape" && cut.phase === "idle") {
+      const scene = sceneRef.current;
+      if (!scene?.isEngineering()) return;
+      event.preventDefault();
+      scene.swapViews();
+      setEngineering(false);
+      return;
+    }
+    event.preventDefault();
+    cut.input({ type: "key", key: event.key, t: event.timeStamp });
+  };
+
+  // 划线、化开、张开、穿过去和合上的时候镜头不跟指针；停在窗口时照常跟，窗里窗外一起转
+  const onCutPhase = useCallback((phase: Phase) => sceneRef.current?.setFollow(phase === "idle" || phase === "peek"), []);
+  // 穿过去：窗外换成刚才窗里的画面；再切一次就换回来
+  const onCutThrough = useCallback(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    scene.swapViews();
+    setEngineering(scene.isEngineering());
+  }, []);
+  const onCutReady = useCallback((cut: Cut) => {
+    cutRef.current = cut;
+  }, []);
+  const noop = useCallback(() => {}, []);
+
   const buttonClass =
     "rounded-full border border-accent/60 bg-background px-3 py-2 text-sm font-semibold text-accent transition-colors hover:bg-surface active:scale-[0.98]";
 
   return (
     <div
       ref={viewportRef}
-      tabIndex={-1}
-      className="panel relative aspect-[4/3] overflow-hidden rounded-3xl bg-background outline-none sm:aspect-[16/10] lg:aspect-auto lg:h-[500px]"
+      tabIndex={0}
+      role="group"
+      aria-label={labels.cut.aria}
+      onKeyDown={onViewportKey}
+      className="panel relative aspect-[4/3] overflow-hidden rounded-3xl bg-background outline-none focus-visible:ring-2 focus-visible:ring-accent sm:aspect-[16/10] lg:aspect-auto lg:h-[500px]"
     >
       <svg
         aria-hidden
@@ -181,6 +233,19 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
         aria-label={labels.scene}
         className={`absolute inset-0 transition-opacity duration-700 ${ready ? "opacity-100" : "opacity-0"}`}
       />
+      {/* 彩蛋：在画布上划一刀或按住魔杖，切开看场景的工程视角；HUD 和按钮在它上面，照常能点 */}
+      {ready && (
+        <CutLayer
+          target={portal}
+          stop
+          tools={EGG_TOOLS}
+          hints={labels.cut}
+          onReady={onCutReady}
+          onPhase={onCutPhase}
+          onThrough={onCutThrough}
+          onClose={noop}
+        />
+      )}
       <HudCorners className="inset-4" />
 
       <div className="pointer-events-none absolute inset-x-6 top-4 flex items-center justify-between gap-4 text-xs text-muted sm:inset-x-8 sm:top-6">
@@ -188,6 +253,7 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
           <span aria-hidden className="size-2 rounded-full bg-(--cat-perception) motion-safe:animate-pulse" />
           {labels.tracking}
           <span className="hidden sm:inline">· {labels.board}</span>
+          {engineering && <span className="text-(--cat-engines)">· {labels.cut.engineering}</span>}
         </span>
         {/* 帧率和位姿是一直在跳的数字，用等宽字体免得来回抖 */}
         <span ref={fpsRef} className="font-mono tabular-nums">
@@ -195,11 +261,11 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
         </span>
       </div>
 
-      <div className="absolute inset-x-6 bottom-4 flex items-end justify-between gap-4 text-xs text-muted sm:inset-x-8 sm:bottom-6">
-        <span ref={poseRef} className="pointer-events-none font-mono tabular-nums" />
+      <div className="pointer-events-none absolute inset-x-6 bottom-4 flex items-end justify-between gap-4 text-xs text-muted sm:inset-x-8 sm:bottom-6">
+        <span ref={poseRef} className="font-mono tabular-nums" />
         {/* 右下角依次是摄像头 AR 和 WebXR 的按钮（D14、D9）；一个按钮都没有时才显示移动鼠标的提示 */}
         {canUseCamera || xrModes.length > 0 ? (
-          <span className="flex shrink-0 flex-wrap justify-end gap-2">
+          <span className="pointer-events-auto flex shrink-0 flex-wrap justify-end gap-2">
             {canUseCamera && (
               <button ref={cameraButtonRef} type="button" onClick={openCameraAR} className={buttonClass}>
                 {labels.camera}
@@ -212,7 +278,7 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
             ))}
           </span>
         ) : (
-          <span className="pointer-events-none hidden shrink-0 pointer-fine:motion-safe:inline">{labels.hint}</span>
+          <span className="hidden shrink-0 pointer-fine:motion-safe:inline">{labels.hint}</span>
         )}
       </div>
 

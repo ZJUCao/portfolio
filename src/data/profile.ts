@@ -172,6 +172,15 @@ const zh = {
       hint: "移动鼠标，换个角度看",
       ar: "在 AR 中查看",
       vr: "在 VR 中查看",
+      // 彩蛋：在取景框里划一刀或按住魔杖，切开看场景的工程视角（docs/design_space_cut.md §6.4）
+      cut: {
+        hold: "在画面上按住，空间会化开",
+        tooShort: "太短了，划长一点",
+        notStraight: "不够直，这把刀只切直线",
+        peek: "点窗口里面或按 Enter 进去，点外面或按 Esc 合上",
+        engineering: "工程视角",
+        aria: "3D 取景框：划一刀或按住，可以切开空间看场景的工程视角；也可以按 Enter 在中间开窗",
+      },
       // 摄像头 AR：首页取景框右下角的按钮，和点开后的全屏叠层
       camera: "用摄像头看 AR",
       cameraAR: {
@@ -401,6 +410,14 @@ const en: typeof zh = {
       hint: "Move the pointer to look around",
       ar: "View in AR",
       vr: "View in VR",
+      cut: {
+        hold: "Press and hold here to dissolve space",
+        tooShort: "Too short. Draw a longer line",
+        notStraight: "Not straight enough. This knife only cuts straight lines",
+        peek: "Click inside or press Enter to step in; click outside or press Esc to close",
+        engineering: "Engineering view",
+        aria: "3D viewport: draw a line or press and hold to cut space open and see the scene's engineering view, or press Enter to open a window in the middle",
+      },
       camera: "Try camera AR",
       cameraAR: {
         title: "Camera AR",

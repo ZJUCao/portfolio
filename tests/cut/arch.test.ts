@@ -41,6 +41,8 @@ const RULES: Readonly<Record<string, Rule>> = {
     globals: ["performance", "requestAnimationFrame", "cancelAnimationFrame"],
     globalScopes: /^createCut$/,
   },
+  // P3: the hint flag reaches storage through globalThis only, inside guarded functions
+  hint: PURE,
   // P2: the keyframes are pure; only the navigation wrapper and the effect layer touch the page
   pageCut: {
     runtime: ["cut/constants", "cut/fxLayer", "cut/geometry", "cut/timeline"],

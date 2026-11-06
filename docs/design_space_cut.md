@@ -1,6 +1,6 @@
 # Design: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); **P2 is done** (2026-11-06), awaiting review, see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
+Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); **P3 is done** (2026-11-06), awaiting review, see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
 
 ## 1. Goal
 
@@ -249,7 +249,7 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | P0 Spike | **Done 2026-11-06, results in §12.** On a branch that is never merged, check four things: whether Web Animations can drive the `clip-path` of `::view-transition-new` inside a view transition; whether `<ViewTransition>` fires `onEnter` on a language switch (the root layout's param changes, so the page should remount); whether a named effect layer is live during the transition; and the three.js stencil portal | ~150, thrown away | Unchanged |
 | P1 Engine | **Done 2026-11-06, awaiting review.** `geometry`, `timeline`, `gesture`, `dust`, `engine`, `fxLayer`, `constants` and their tests | ~900 | Unchanged (the new modules are not used yet) |
 | P2 Camera AR and language switch | **Done 2026-11-06, awaiting review, see §13.** `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
-| P3 404, easter egg, hint | The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
+| P3 404, easter egg, hint | **Done 2026-11-06, awaiting review, see §13.** The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
 | P4 Gesture mode | `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
 | P5 Project cards | The detail page's header image and the shared-element transition | ~120 | F14 usable |
 
@@ -324,3 +324,15 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Not tried: phones (including "Opening the camera" in the middle of the window and the view fading in), Safari, Firefox.
 - Seen, for review: on a desktop the window opens at the button, which falls on the board view's black margin, so the window shows only black.
 - When testing: after switching Git branches the dev server may stop noticing changes to `globals.css` and keep serving the old styles; restarting it fixes that.
+
+### P3 (2026-11-06, awaiting review)
+
+- On the site: the easter egg in the home page's 3D viewport and the 404 page can now be cut. New: `src/cut/hint.ts` and `src/components/NotFoundCut.tsx`; changed: `heroScene.ts` (the stencil portal and the engineering view), `HeroViewport.tsx`, `CutLayer.tsx`, `global-not-found.tsx` and `profile.ts`.
+- Easter egg: draw a line or hold the wand in the viewport and the window shows the engineering view (a dark blueprint background and grid, normal shading, wireframes, and an amber bounding box and local axes on every part). Clicking inside or Enter steps through, the two views swap and the HUD says "Engineering view"; cutting again swaps back, and Esc returns straight to the normal view. The viewport takes Tab focus, and Enter or Space opens a window at its center. The camera stops following the pointer while drawing or dissolving; at the window it follows as usual, turning both views together in place of parallax. The HUD's bottom row no longer catches the pointer, only its buttons do, so a stroke can start next to them.
+- 404 page: the layer that catches the pointer sits under the card, so the card's buttons still work; the effect layer is attached to body, above everything. Behind the window is the home page in an iframe preloaded when the page is idle (with the same language rules as the root path `/`); "回到首页" or "Back to home" cuts from the button's center, and the home page's language follows the button. Once the cut fills the screen, `location.replace` goes home.
+- Hints: the first time the mouse is over a place where the wand works (the viewport, the 404 page's blank areas), a "hold" hint appears next to the pointer, leaves on the first press or after 4.5 s, and is remembered in local storage; on touch-only devices it appears at the bottom once the layer is 60% on screen. Strokes too short or not straight get a hint at the bottom, and so does waiting at the window.
+- Tests: new `tests/cut/hint.test.ts` (no errors without local storage or when reads and writes are refused), and a `hint` rule in the architecture test.
+- First-load code: the easter egg's cut layer downloads once the 3D scene is ready, so the home page's first-load scripts contain no cut code; they are about 1.3 KB larger than in P2 (the viewport's keyboard handling and the new copy).
+- Tried in desktop Chromium: the easter egg's hold hint, a knife cut opening the window, clicking inside to step through, Esc to return, Enter to open a window and Esc to close it with a scar; on the 404 page (static build), a stroke starting in a blank area and crossing the card, and "Back to home", both cut open and went home.
+- Not tried: the wand in these two places (the browser tool here cannot hold a press; the wand was tried on P1's test page), the hint on touch, phones, Safari and Firefox. The dev server cannot show the 404 page with `output: "export"` (as before), so it has to be tested on the static build.
+- For review: on phones the 404 card fills most of the screen, leaving little blank space to start a stroke (one can start at the edge and cross the card).
