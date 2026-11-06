@@ -1,6 +1,6 @@
 # Requirements: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, all 13 questions in §10 settled with the recommended option (A); the design doc is confirmed too; the P0 spike is done and the language switch now has the site start the view transition itself (design doc §12, adopted), with no change to the feature itself; the P1 engine is done, awaiting review · Prototype: [神刀转场](https://claude.ai/artifact/PSnnoBieR9vYQ4p3VUNEQS) (private page; its source exists only in that published page)
+Status: **Confirmed 2026-11-06**, all 13 questions in §10 settled with the recommended option (A); the design doc is confirmed too; the P0 spike is done and the language switch now has the site start the view transition itself (design doc §12, adopted), with no change to the feature itself; the P1 engine is merged; P2 (camera AR and the language switch) is done, awaiting review · Prototype: [神刀转场](https://claude.ai/artifact/PSnnoBieR9vYQ4p3VUNEQS) (private page; its source exists only in that published page)
 
 ## 1. Goal
 
@@ -127,16 +127,16 @@ A feature is marked "done" only after it has been tried on real iPhone Safari an
 | :--- | :--- | :--- |
 | F1 | Knife cut: straight-line check, snapping taut, lens window, cyan rim | Playable in the prototype (tried in a desktop browser, not on a phone); the portfolio's engine is written (unit tests, and tried in a desktop browser on an uncommitted test page), not visible on the site yet |
 | F2 | Wand: hold to set the size, gold dust, ripples, moving edge | Playable in the prototype (tried in a desktop browser, not on a phone); the portfolio's engine is written (unit tests, and tried in a desktop browser on an uncommitted test page), not visible on the site yet |
-| F3 | Click to cut | Playable in the prototype (tried in a desktop browser, not on a phone); the portfolio's engine is written (unit tests; in a browser only the same animation triggered by Enter was tried), not visible on the site yet |
+| F3 | Click to cut | Playable in the prototype (tried in a desktop browser, not on a phone); on the site the language switch and the camera AR button use it (tried in desktop Chromium; not on phones, Safari or Firefox) |
 | F4 | Stopping at the window, parallax, stepping through, closing (scar, dust drawn back) | Playable in the prototype (tried in a desktop browser, not on a phone); the portfolio's engine is written (unit tests, and tried in a desktop browser on an uncommitted test page), not visible on the site yet |
-| F5 | Crossfade instead when reduce motion is on | A switch in the prototype that follows the system setting by default; supported by the portfolio's engine (unit tests, not tried in a browser), not visible on the site yet |
-| F6 | Keyboard use: Enter or Space opens a window and stops, Enter steps through, Esc closes (Q4) | The prototype only has a "演示一次" (play once) button, which does not count; the portfolio's engine handles all three keys (unit tests; Enter opening a window tried in a desktop browser), not visible on the site yet |
+| F5 | Crossfade instead when reduce motion is on | A switch in the prototype that follows the system setting by default; on the site the language switch crossfades instead (tried in desktop Chromium with the setting simulated by script); camera AR's crossfade has unit tests only |
+| F6 | Keyboard use: Enter or Space opens a window and stops, Enter steps through, Esc closes (Q4) | The prototype only has a "演示一次" (play once) button, which does not count; on the site camera AR works: Enter on the button opens a window and stops, Enter again steps through, Esc closes (tried in desktop Chromium); the 404 page and the easter egg come in P3 |
 | F7 | A "hold" hint for the wand the first time, not shown again once seen (Q5) | Not started |
-| F8 | Camera AR entrance | Not started |
-| F9 | Language switch | Not started; switching language is a client-side navigation, but React does not start a view transition for it, so the site has to start one itself, which P0 showed works (design doc §12) |
+| F8 | Camera AR entrance | Usable on the site, tried in desktop Chromium: it cuts from the button and stops; clicking inside or Enter steps through, clicking outside or Esc closes. Not tried on phones (including "Opening the camera" in the middle of the window) |
+| F9 | Language switch | Usable on the site, tried in desktop Chromium (the dev server and the static build, also from the phone-width menu): the whole page is cut open from the button. Not tried in Safari, Firefox or on real phones |
 | F10 | 404 page | Not started |
 | F11 | Easter egg: cut open the home page's 3D viewport to see an engineering view of the 3D scene (Q6) | Not started |
-| F12 | New copy (hints and the like) in Chinese and English, in `src/data/profile.ts` | Not started |
+| F12 | New copy (hints and the like) in Chinese and English, in `src/data/profile.ts` | The hint while camera AR waits at the window, in both languages; the other hints come with P3 |
 | F13 | Hand gestures (camera): a switch on the home page, computers only at first (Q11, Q13); pinch to press, all three ways in, a cursor that follows the hand, a camera window | Playable in the prototype (only on a localhost address; tried on a PC webcam, and you found it smooth; not tried on a phone); not started in the portfolio |
 | F14 | A header image on the project detail page (the card's image, above the title), which the card's cover grows into (a shared-element transition, Q7, D6) | Not started; not in the prototype |
 

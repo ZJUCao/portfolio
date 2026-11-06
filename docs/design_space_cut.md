@@ -1,6 +1,6 @@
 # Design: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; **the P1 engine is done** (2026-11-06), awaiting review · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
+Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); **P2 is done** (2026-11-06), awaiting review, see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
 
 ## 1. Goal
 
@@ -52,7 +52,7 @@ All adopted as A on 2026-11-06.
 | `src/cut/dust.ts` | Dust particles: at most 1,500, canvas at no more than 2× pixel ratio | React | P1 |
 | `src/cut/engine.ts` | The cut engine: moves between idle, drawing, dissolving, opening, at the window, stepping through and closing; draws the rim, ripples and dust; sets the window shape through the target's interface. Its core, `createCutController`, does not touch the DOM; `createCut` wires it to a real element | React | P1 |
 | `src/cut/fxLayer.ts` | The DOM side of the effect layer: an SVG for the rim, ripples, knife stroke and wand tip, and a canvas for the dust. Colors are set in style, because SVG attributes cannot read CSS variables | React | P1 |
-| `src/components/CutLayer.tsx` | React wrapper: mounts the effect layer and passes pointer and keyboard events to `gesture.ts` | | P2 |
+| `src/components/CutLayer.tsx` | React wrapper: mounts the effect layer and passes pointer events to the engine; it catches the pointer only while a cut is under way or where the knife or wand is on, and otherwise lets clicks through. Keyboard stays with each entrance, which calls the engine's methods | | P2 |
 | `src/cut/pageCut.ts` | Page-change cuts: draws the line on the effect layer first, then wraps the navigation in `document.startViewTransition` and drives `::view-transition-new(root)` (P0-1 and P0-2 in §12) | React components | P2 |
 | `Nav.tsx` | The language button: prefetches the other language's page on pointer enter or focus; on click, stops the default navigation and hands it to `pageCut` | | P2 |
 | `HeroViewport.tsx`, `CameraAR.tsx` | Camera AR entrance: clicking the button cuts from it, and the window first shows "Opening the camera" (Q9) | | P2 |
@@ -131,16 +131,19 @@ export function createCutController(renderer: CutRenderer, target: CutTarget, op
 ### 5.3 `src/cut/pageCut.ts`
 
 ```ts
-export const CUT_TYPE = "cut";
-export function pageCutKeyframes(line: Line, viewport: Size): Keyframe[]; // pure, testable: the lens opens (200 ms), then expands to cover the screen (480 ms)
+export const CUT_TYPE = "cut";       // the cut's view transition type
+export const FADE_TYPE = "cut-fade"; // the reduce-motion crossfade (200 ms)
+export const PAGE_CUT_MS = 680;      // the part inside the transition: the lens opens in 200 ms, then expands in 480 ms
+export function pageCutWindow(line: Line, viewport: Size, ms: number): { polygon: Pt[]; rim: RimStyle }; // pure: the window and rim at a moment
+export function pageCutKeyframes(line: Line, viewport: Size): Keyframe[]; // pure: that curve sampled at steady steps into keyframes
 export function cutNavigate(options: {
   origin: Pt;           // center of the language button
   navigate(): void;     // router.push(target)
   arrived(): boolean;   // whether the new page is in, e.g. <html lang> is already the target language
   reducedMotion: boolean;
-}): Promise<void>;      // without view transition support it only calls navigate()
-// pageCut creates the effect layer itself, on body, with view-transition-name: cut-fx.
-// If React clears it when the root layout remounts, the update callback puts it back (to verify in P2)
+}): Promise<void>;      // without view transition support it only calls navigate(); if the new page takes over 3 s it goes on anyway
+// pageCut creates the effect layer itself, on body, named cut-fx only during the transition.
+// If React clears it when the root layout remounts, the update callback puts it back (P2: it was still there after every switch)
 ```
 
 ### 5.4 `src/cut/hand/*`
@@ -162,7 +165,7 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 4. Then `document.startViewTransition({ update, types: ["cut"] })` is called. `update` runs `router.push` and uses a MutationObserver to resolve once `<html lang>` becomes the target language; it must not wait for `requestAnimationFrame` (§12.1).
 5. Once the transition is ready, Web Animations plays `pageCutKeyframes` on the `clip-path` of `::view-transition-new(root)`: the lens opens in 200 ms, then expands to fill the screen in 480 ms. The whole page is cut, header included. The old page stays underneath thanks to `html:active-view-transition-type(cut)::view-transition-old(root) { animation: none }`.
 6. The effect layer is live during the transition (confirmed in P0) and keeps drawing the cyan rim; its old snapshot is hidden with `display: none` and its group gets a `z-index`.
-7. With reduce motion on6. With reduce motion on, a 200 ms crossfade instead. Browsers without support switch directly.
+7. With reduce motion on, a 200 ms crossfade instead. Browsers without support switch directly.
 
 ### 6.2 Camera AR (click to cut, stops at the window)
 
@@ -170,7 +173,9 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 2. When `CameraAR` mounts, the overlay starts fully clipped (an empty window); the engine then cuts automatically from the button's center and stops at a medium window.
 3. On phones, until the camera shows a picture, the middle of the window shows "Opening the camera" (the existing `cameraAR.starting` copy), and the view fades in when it arrives (Q9).
 4. Click inside the window or press Enter: step through, and the overlay fills the screen as it does after opening today. Click outside or press Esc: the window closes and the existing `closeCameraAR` runs, so the Back button behaves as before.
-5. Focus: while at the window, focus is on the overlay's close button (existing behavior).
+5. Focus: while at the window, focus is on the overlay's close button (existing behavior); Enter then only steps through and does not press the close button.
+6. While at the window, a hint line at the bottom of the screen says: click inside or press Enter to step in, click outside or press Esc to close.
+7. If the window size changes while at the window, the overlay opens fully. Until the overlay covers the screen, the home page's 3D scene keeps running.
 
 ### 6.3 404 page (knife or wand, no stop)
 
@@ -243,7 +248,7 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | :--- | :--- | :--- | :--- |
 | P0 Spike | **Done 2026-11-06, results in §12.** On a branch that is never merged, check four things: whether Web Animations can drive the `clip-path` of `::view-transition-new` inside a view transition; whether `<ViewTransition>` fires `onEnter` on a language switch (the root layout's param changes, so the page should remount); whether a named effect layer is live during the transition; and the three.js stencil portal | ~150, thrown away | Unchanged |
 | P1 Engine | **Done 2026-11-06, awaiting review.** `geometry`, `timeline`, `gesture`, `dust`, `engine`, `fxLayer`, `constants` and their tests | ~900 | Unchanged (the new modules are not used yet) |
-| P2 Camera AR and language switch | `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
+| P2 Camera AR and language switch | **Done 2026-11-06, awaiting review, see §13.** `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
 | P3 404, easter egg, hint | The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
 | P4 Gesture mode | `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
 | P5 Project cards | The detail page's header image and the shared-element transition | ~120 | F14 usable |
@@ -303,3 +308,19 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 | P0-1 | The language switch no longer relies on React's `onEnter`. The language button's `onClick` stops `Link`'s default navigation and `pageCut` calls `document.startViewTransition({ update, types: ["cut"] })` instead: `update` runs `router.push` and resolves once `<html lang>` becomes the target language; when ready, it animates `::view-transition-new(root)`. The whole page is cut, header included (its text changes language anyway), so step 4 of §6.1, "the header stays still", is dropped | Rewrites §5.3 and §6.1; `pageCut` gets simpler, and pages no longer need a `<ViewTransition>` around them. Browsers without view transitions navigate as usual |
 | P0-2 | Hide the wait for the new page: prefetch the other language's page when the pointer moves onto the language button or the button gets focus; on click, first draw the line on the live page (120 ms, then a 40 ms pause) while the data loads, and only then start the view transition, in which the window opens and expands (200 + 480 ms). If the data arrives within 160 ms the total is about 0.9 s (including a 50–70 ms render wait); if not, the line stays on screen until it does | D9's timing is unchanged; only the first 160 ms move outside the transition. In the worst case the first switch is a few hundred milliseconds late |
 | P0-3 | Safari, Firefox and phones were not tested. OQ-5's fallback stays (crossfade or a plain switch where unsupported); test on real devices after P2 | None |
+
+## 13. Progress
+
+### P2 (2026-11-06, awaiting review)
+
+- On the site: the language switch and "Try camera AR" now cut space open. The code is in `src/cut/pageCut.ts` and `src/components/CutLayer.tsx`, with changes to `Nav.tsx`, `HeroViewport.tsx`, `CameraAR.tsx`, `globals.css` and `profile.ts`.
+- While camera AR waits at the window, a hint line sits at the bottom of the screen (new copy `cameraAR.peekHint`); if the window size changes at that point, the overlay opens fully; the home page's 3D scene keeps running until the overlay covers the screen.
+- Tests: new `tests/cut/pageCut.test.ts` (keyframes with the same points, starting as a line, fully open at 200 ms, covering the screen at the end, the D9 timing), and a `pageCut` rule in the architecture test.
+- Tried in desktop Chromium (the browser built into the Claude desktop app):
+  - Language switch: on the dev server and the static build, and from the phone-width menu. The old page stays outside the cut and the new one shows through the lens.
+  - In the static build, hovering first to prefetch and then clicking: 43 ms from starting the transition to ready (326 ms without prefetch in P0). With the browser pane hidden, frames are throttled and the line phase measured 311 ms against the designed 160 ms, so it needs another look in a visible browser.
+  - Reduce motion (the system setting simulated by script): the language switch crossfades instead.
+  - Camera AR (the board view on a desktop): a click and Enter both cut from the button and stop; clicking inside or Enter steps through; clicking outside or Esc closes it and the overlay, the URL goes back and focus returns to the button.
+- Not tried: phones (including "Opening the camera" in the middle of the window and the view fading in), Safari, Firefox.
+- Seen, for review: on a desktop the window opens at the button, which falls on the board view's black margin, so the window shows only black.
+- When testing: after switching Git branches the dev server may stop noticing changes to `globals.css` and keep serving the old styles; restarting it fixes that.

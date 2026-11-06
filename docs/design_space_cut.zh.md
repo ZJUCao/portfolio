@@ -1,6 +1,6 @@
 # 设计：空间切口转场
 
-状态：**已确认（2026-11-06）**，D1–D9 和 OQ-1–OQ-5 全部采用建议；**P0 验证已完成**（§12），2026-11-06 采用 P0-1、P0-2；**P1 引擎已完成**（2026-11-06），待评审 · 依据：[需求文档](requirements_space_cut.zh.md)（已确认）· 分期：P0–P5（§9）
+状态：**已确认（2026-11-06）**，D1–D9 和 OQ-1–OQ-5 全部采用建议；**P0 验证已完成**（§12），2026-11-06 采用 P0-1、P0-2；P1 引擎已合入（PR #5）；**P2 已完成**（2026-11-06），待评审，见 §13 · 依据：[需求文档](requirements_space_cut.zh.md)（已确认）· 分期：P0–P5（§9）
 
 ## 1. 目标
 
@@ -52,7 +52,7 @@
 | `src/cut/dust.ts` | 尘埃粒子：最多 1,500 个，canvas 最多按 2 倍像素比 | React | P1 |
 | `src/cut/engine.ts` | 切口引擎：在空闲、划线、化开、张开、停在窗口、穿过去、合上之间切换；画边缘、涟漪、尘埃；调用目标元素的接口设置窗口形状。核心 `createCutController` 不碰 DOM，`createCut` 把它接到真实元素上 | React | P1 |
 | `src/cut/fxLayer.ts` | 效果层的 DOM 部分：SVG 画边缘、涟漪、刀痕和杖尖，canvas 画尘埃。颜色写在 style 里，因为 SVG 的属性读不了 CSS 变量 | React | P1 |
-| `src/components/CutLayer.tsx` | React 包装：挂上画效果的层，把指针和键盘事件交给 `gesture.ts` | | P2 |
+| `src/components/CutLayer.tsx` | React 包装：挂上画效果的层，把指针事件交给引擎；只在切口进行中、或者入口开着刀和魔杖时才接指针，其余时候让点击穿到下面。键盘由各入口自己处理，再调用引擎的方法 | | P2 |
 | `src/cut/pageCut.ts` | 换页面的切口：先在效果层上画线，再用 `document.startViewTransition` 包住跳转，驱动 `::view-transition-new(root)`（§12 的 P0-1、P0-2） | React 组件 | P2 |
 | `Nav.tsx` | 语言按钮：鼠标移上去或获得焦点时预取另一种语言的页面；点击时拦下默认跳转，交给 `pageCut` | | P2 |
 | `HeroViewport.tsx`、`CameraAR.tsx` | 摄像头 AR 入口：点按钮从按钮位置切开，窗里先显示"正在打开摄像头"（Q9） | | P2 |
@@ -131,16 +131,19 @@ export function createCutController(renderer: CutRenderer, target: CutTarget, op
 ### 5.3 `src/cut/pageCut.ts`
 
 ```ts
-export const CUT_TYPE = "cut";
-export function pageCutKeyframes(line: Line, viewport: Size): Keyframe[]; // 纯函数，可以测试：透镜张开 200 ms，再扩大到盖满屏幕 480 ms
+export const CUT_TYPE = "cut";       // 切口的视图过渡类型
+export const FADE_TYPE = "cut-fade"; // 减少动态效果时的淡入淡出（200 ms）
+export const PAGE_CUT_MS = 680;      // 过渡里的部分：透镜张开 200 ms，再扩大 480 ms
+export function pageCutWindow(line: Line, viewport: Size, ms: number): { polygon: Pt[]; rim: RimStyle }; // 纯函数：某一刻的窗口和边缘
+export function pageCutKeyframes(line: Line, viewport: Size): Keyframe[]; // 纯函数：把上面的曲线等间隔取样成关键帧
 export function cutNavigate(options: {
   origin: Pt;           // 语言按钮的中心
   navigate(): void;     // router.push(目标地址)
   arrived(): boolean;   // 新页面到了没有，比如 <html lang> 已经是目标语言
   reducedMotion: boolean;
-}): Promise<void>;      // 不支持视图过渡时只调 navigate()
-// 效果层由 pageCut 自己建，挂在 body 上，带 view-transition-name: cut-fx。
-// 根布局重新挂载后它如果被 React 清掉，就在 update 回调里重新挂回去（P2 要验证）
+}): Promise<void>;      // 不支持视图过渡时只调 navigate()；新页面 3 秒还没到也照样往下走
+// 效果层由 pageCut 自己建，挂在 body 上，只在过渡期间带 view-transition-name: cut-fx。
+// 根布局重新挂载后它如果被 React 清掉，就在 update 回调里重新挂回去（P2：切换后它都还在页面上）
 ```
 
 ### 5.4 `src/cut/hand/*`
@@ -162,7 +165,7 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 4. 然后调 `document.startViewTransition({ update, types: ["cut"] })`。`update` 里 `router.push`，用 MutationObserver 等 `<html lang>` 变成目标语言就放行，不能等 `requestAnimationFrame`（§12.1）。
 5. 过渡就绪后，用 Web Animations 给 `::view-transition-new(root)` 的 `clip-path` 播放 `pageCutKeyframes`：透镜张开 200 ms，再扩大到铺满屏幕 480 ms。切开的是整页，导航栏也一起切。旧页面靠 `html:active-view-transition-type(cut)::view-transition-old(root) { animation: none }` 留着当底。
 6. 效果层在过渡期间是实时的（P0 已确认），继续画青色边缘；它的旧快照用 `display: none` 藏掉，分组设 `z-index`。
-7. 减少动态效果时6. 减少动态效果时，改成 200 ms 的淡入淡出。浏览器不支持时直接切换。
+7. 减少动态效果时，改成 200 ms 的淡入淡出。浏览器不支持时直接切换。
 
 ### 6.2 摄像头 AR（点击自动切，停在窗口）
 
@@ -170,7 +173,9 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 2. `CameraAR` 挂载时，叠层先是全部裁掉（窗口为空），然后引擎从按钮中心自动切开，停在中等大小的窗口。
 3. 手机上摄像头还没出画面时，窗口中间显示"正在打开摄像头"（已有文案 `cameraAR.starting`），画面出来后淡入（Q9）。
 4. 点窗口里面或按 Enter：穿过去，叠层铺满，和现在打开后的样子一样。点外面或按 Esc：窗口合上，然后调用现有的 `closeCameraAR`，按返回键的行为不变。
-5. 焦点：停在窗口时，焦点在叠层的关闭按钮上（现有行为）。
+5. 焦点：停在窗口时，焦点在叠层的关闭按钮上（现有行为）；这时 Enter 只用来穿过去，不会按下关闭按钮。
+6. 停在窗口时屏幕底部有一行提示：点里面或按 Enter 进去，点外面或按 Esc 合上。
+7. 停在窗口时窗口尺寸变了，叠层直接整个打开。叠层盖满屏幕之前，首页的 3D 画面照常转。
 
 ### 6.3 404 页（划一刀或魔杖，不停）
 
@@ -243,7 +248,7 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 | :--- | :--- | :--- | :--- |
 | P0 验证 | **已完成（2026-11-06），结果见 §12。** 在一个不合并的分支上验证四件事：视图过渡里能不能用 Web Animations 驱动 `::view-transition-new` 的 `clip-path`；切换语言时 `<ViewTransition>` 会不会触发 `onEnter`（根布局的参数变了，页面应该会重新挂载）；命名的效果层在过渡期间是不是实时的；three.js 的模板缓冲传送门 | ~150，之后丢弃 | 不变 |
 | P1 引擎 | **已完成（2026-11-06），待评审。** `geometry`、`timeline`、`gesture`、`dust`、`engine`、`fxLayer`、`constants` 和测试 | ~900 | 不变（新模块还没用上） |
-| P2 摄像头 AR 和语言切换 | `CutLayer`、`pageCut`、`Nav`、`HeroViewport`、`CameraAR`、文案 | ~450 | F3、F8、F9 可用 |
+| P2 摄像头 AR 和语言切换 | **已完成（2026-11-06），待评审，见 §13。** `CutLayer`、`pageCut`、`Nav`、`HeroViewport`、`CameraAR`、文案 | ~450 | F3、F8、F9 可用 |
 | P3 404、彩蛋、提示 | 404 的客户端组件、`heroScene` 的传送门和工程视角、`hint` | ~600 | F1、F2、F4、F7、F10、F11 可用 |
 | P4 手势模式 | `hand/*`、`fetch-mediapipe`、开关、小窗、隐私说明 | ~550 | F13 可用（只在电脑上） |
 | P5 项目卡片 | 详情页头图和共享元素过渡 | ~120 | F14 可用 |
@@ -303,3 +308,19 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 | P0-1 | 语言切换不再靠 React 的 `onEnter`。语言按钮的 `onClick` 拦下 `Link` 的默认跳转，改由 `pageCut` 调 `document.startViewTransition({ update, types: ["cut"] })`：`update` 里 `router.push`，等 `<html lang>` 变成目标语言就放行；就绪后驱动 `::view-transition-new(root)`。切开的是整页，导航栏也一起切（它的文字本来就会换语言），去掉 §6.1 第 4 步的"导航栏不动" | 改写 §5.3、§6.1；`pageCut` 变简单，页面外面不用再包 `<ViewTransition>`。不支持视图过渡的浏览器照常跳转 |
 | P0-2 | 藏住等新页面的时间：鼠标移到语言按钮上或按钮获得焦点时，预取另一种语言的页面；点击后先在活的页面上画那条线（120 ms，再停 40 ms），同时加载数据，然后才开始视图过渡，窗口张开再扩大（200 + 480 ms）。数据在 160 ms 内到了，总时长约 0.9 秒（含 50–70 ms 的渲染等待）；没到，线就停在那里等 | D9 的时间分配不变，只是前 160 ms 挪到过渡外面画。最坏情况下第一次切换会晚几百毫秒 |
 | P0-3 | Safari、Firefox 和手机都没测。OQ-5 的退路保留（不支持就淡入淡出或直接切换），P2 做完后在真机上补测 | 无 |
+
+## 13. 进展
+
+### P2（2026-11-06，待评审）
+
+- 网站上：中英切换和"用摄像头看 AR"都是空间切口了。代码在 `src/cut/pageCut.ts`、`src/components/CutLayer.tsx`，改了 `Nav.tsx`、`HeroViewport.tsx`、`CameraAR.tsx`、`globals.css` 和 `profile.ts`。
+- 摄像头 AR 停在窗口时，屏幕底部有一行提示（新文案 `cameraAR.peekHint`）；停在窗口时窗口尺寸变了，叠层直接整个打开；叠层盖满屏幕之前首页的 3D 画面照常转。
+- 测试：新增 `tests/cut/pageCut.test.ts`（关键帧点数相同、从一条线开始、200 ms 时完全张开、最后盖满屏幕、D9 的时长），架构测试加了 `pageCut` 的规则。
+- 桌面 Chromium（Claude 桌面版内置的浏览器）里试过：
+  - 中英切换：开发服务器和静态构建都试过，也试过手机宽度下的菜单。旧页面留在切口外面，新页面从透镜里露出来。
+  - 静态构建里先悬停预取再点击：从开始过渡到就绪 43 ms（P0 没有预取时是 326 ms）。浏览器面板隐藏时帧率被压低，画线阶段量到 311 ms，设计值是 160 ms，要在可见的浏览器里再看。
+  - 减少动态效果（用脚本模拟系统设置）：语言切换改成淡入淡出。
+  - 摄像头 AR（桌面上是标定板画面）：点击和按 Enter 都会从按钮切开并停住；点窗里或按 Enter 穿过去，点窗外或按 Esc 合上并关掉叠层，网址退回、焦点回到按钮。
+- 没试的：手机（包括"正在打开摄像头"写在窗口中间、画面淡入）、Safari、Firefox。
+- 观察到的问题，留给评审：桌面上切口窗口开在按钮那里，正好是标定板画面的黑边，窗里只看到黑色。
+- 测试时注意：切换 Git 分支之后，开发服务器可能不再察觉 `globals.css` 的修改，页面一直用旧样式；重启开发服务器就好。

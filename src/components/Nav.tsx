@@ -2,9 +2,9 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
-import { LOCALE_STORAGE_KEY, type Locale } from "@/i18n";
+import { usePathname, useRouter } from "next/navigation";
+import { type MouseEvent, useEffect, useState } from "react";
+import { htmlLang, LOCALE_STORAGE_KEY, type Locale } from "@/i18n";
 
 type Props = {
   locale: Locale;
@@ -21,6 +21,7 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 // 手机上链接收进菜单：点右边的按钮打开一整屏的面板，链接按顺序依次上移淡入
 export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const other: Locale = locale === "zh" ? "en" : "zh";
   // 切换语言时停留在同一页面，只替换路径开头的语言段
@@ -32,13 +33,37 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
     { href: `/${locale}/contact`, label: labels.contact },
   ];
 
-  const switchLanguage = () => {
+  // 鼠标移到语言按钮上或按钮获得焦点时，先拿好另一种语言的页面和切口的代码，点下去就能切（P0-2）
+  const warmUp = () => {
+    router.prefetch(switchHref);
+    void import("@/cut/pageCut").catch(() => {});
+  };
+
+  // 切换语言是"空间切口"：从按钮中间切开，露出另一种语言的同一页（docs/design_space_cut.md §6.1）。
+  // 按着修饰键或用中键点时不拦，照旧在新标签页打开
+  const switchLanguage = (event: MouseEvent<HTMLAnchorElement>) => {
     setOpen(false);
     try {
       localStorage.setItem(LOCALE_STORAGE_KEY, other);
     } catch {
       // 隐私模式等情况下存不了，不影响切换
     }
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    const box = event.currentTarget.getBoundingClientRect();
+    const origin = [box.left + box.width / 2, box.top + box.height / 2] as const;
+    const target = htmlLang(other);
+    const navigate = () => router.push(switchHref);
+    import("@/cut/pageCut")
+      .then(({ cutNavigate }) =>
+        cutNavigate({
+          origin,
+          navigate,
+          arrived: () => document.documentElement.lang === target,
+          reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        }),
+      )
+      .catch(() => navigate());
   };
 
   // 菜单打开时页面不能滚动；按 Esc、或窗口变宽到不用菜单时关闭
@@ -100,6 +125,8 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
           <Link
             href={switchHref}
             onClick={switchLanguage}
+            onPointerEnter={warmUp}
+            onFocus={warmUp}
             hrefLang={other}
             aria-label={switchAria}
             className="hidden whitespace-nowrap rounded-full border border-line px-3 py-2 text-sm font-semibold text-muted transition-colors hover:border-accent hover:text-accent active:scale-[0.98] sm:block"
@@ -164,6 +191,8 @@ export function Nav({ locale, name, labels, switchLabel, switchAria }: Props) {
                 <Link
                   href={switchHref}
                   onClick={switchLanguage}
+                  onPointerEnter={warmUp}
+                  onFocus={warmUp}
                   hrefLang={other}
                   aria-label={switchAria}
                   className="block py-3 text-3xl font-semibold text-muted"

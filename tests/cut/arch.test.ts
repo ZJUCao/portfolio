@@ -41,6 +41,12 @@ const RULES: Readonly<Record<string, Rule>> = {
     globals: ["performance", "requestAnimationFrame", "cancelAnimationFrame"],
     globalScopes: /^createCut$/,
   },
+  // P2: the keyframes are pure; only the navigation wrapper and the effect layer touch the page
+  pageCut: {
+    runtime: ["cut/constants", "cut/fxLayer", "cut/geometry", "cut/timeline"],
+    globals: ["document", "window", "performance", "requestAnimationFrame", "cancelAnimationFrame"],
+    globalScopes: /^(ensureLayer|arrival|cutNavigate)$/,
+  },
 };
 
 const scans = (): ModuleScan[] => scanDirectory(CUT_DIR, BROWSER_GLOBALS).filter((scan) => !scan.path.includes(`${join("cut", "hand")}`));

@@ -196,6 +196,8 @@ const zh = {
         pointCaption: "用另一台设备的摄像头对准这块屏幕",
         boardLabel: "10×7 的棋盘格标定板",
         qrLabel: "二维码：在手机上打开摄像头 AR",
+        // 空间切口停在窗口时的提示（docs/design_space_cut.md §6.2）
+        peekHint: "点窗口里面或按 Enter 进去，点外面或按 Esc 合上",
       },
     },
     featured: "精选项目",
@@ -422,6 +424,7 @@ const en: typeof zh = {
         pointCaption: "Point another device's camera at this screen",
         boardLabel: "A 10×7 chessboard calibration board",
         qrLabel: "QR code that opens camera AR on your phone",
+        peekHint: "Click inside or press Enter to step in; click outside or press Esc to close",
       },
     },
     featured: "Featured projects",
