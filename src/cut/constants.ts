@@ -123,6 +123,11 @@ export const GESTURE = Object.freeze({
   strokeMovePx: 10,
   strokeMovePxHand: 40,
   strokeWindowMs: 250,
+  /** A hand pauses after pinching before it sets off, so with knife and wand both on, a pinch waits
+   *  this long before the wand starts; moving further than strokeMovePxHand meanwhile is a stroke… */
+  wandDelayMsHand: 450,
+  /** …and once the wand has started, such a move still becomes a stroke within this long. */
+  strokeWindowMsHand: 300,
   /** A release within this distance of the press is a tap (click to cut). */
   tapMovePx: 12,
   tapMovePxHand: 40,
@@ -151,4 +156,21 @@ export const COLORS = Object.freeze({
   /** Q10: the wand's gold is the "engines" category colour. */
   wand: "var(--cat-engines, #fbbf6a)",
   wandCore: "#fff3d6",
+});
+
+/** Hand gestures (§3.5 of the requirements, D5): one hand, a pinch of thumb and index finger is a press. */
+export const HAND = Object.freeze({
+  /** Fingertip distance over palm length: pinched below pinchOn, released above pinchOff. */
+  pinchOn: 0.3,
+  pinchOff: 0.45,
+  /** The part of the camera picture that maps onto the viewport: 12% margins left, right and top, 18% at the bottom. */
+  region: Object.freeze({ x0: 0.12, x1: 0.88, y0: 0.12, y1: 0.82 }),
+  /** A hand missing longer than this counts as a release. */
+  lostMs: 300,
+  /** One Euro filter on the cursor. */
+  minCutoff: 1.2,
+  beta: 0.012,
+  dCutoff: 1,
+  /** The pointer id the hand's events carry, apart from any mouse or touch. */
+  pointerId: 7001,
 });

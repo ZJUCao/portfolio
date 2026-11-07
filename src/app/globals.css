@@ -213,3 +213,13 @@ html:active-view-transition-type(cut-fade)::view-transition-new(root) {
 ::view-transition-group(cut-fx) {
   z-index: 10;
 }
+
+/* 手势模式：捏住以后光标外圈的金色在魔杖开始前转满（HandMode.tsx，时长是 GESTURE.wandDelayMsHand） */
+@keyframes hand-wait {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}

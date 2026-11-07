@@ -1,6 +1,6 @@
 # Design: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); **P3 is done** (2026-11-06), awaiting review, see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
+Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); P3 is merged (PR #7); **P4 is done** (2026-11-06), awaiting review, see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
 
 ## 1. Goal
 
@@ -59,8 +59,9 @@ All adopted as A on 2026-11-06.
 | `global-not-found.tsx` and its client component | The 404 cut, with an iframe of the home page behind the window | | P3 |
 | `heroScene.ts` | Turn on the stencil buffer; the easter egg's portal and the engineering-view pass | React | P3 |
 | `src/cut/hint.ts` | Show the "hold" hint the first time and remember it in local storage (every read and write in try/catch) | React | P3 |
-| `src/cut/hand/oneEuro.ts`, `pinch.ts`, `mapping.ts` | Pure gesture functions: smoothing, the pinch check (with hysteresis), mapping picture coordinates to the viewport | DOM | P4 |
-| `src/cut/hand/tracker.ts` | Opens the camera, loads MediaPipe, detects hands each frame and passes the result to `gesture.ts` | React | P4 |
+| `src/cut/hand/oneEuro.ts`, `pinch.ts`, `mapping.ts`, `handInput.ts` | Pure gesture functions: smoothing, the pinch check (with hysteresis), mapping picture coordinates to the viewport, and turning one hand into input events frame by frame | DOM | P4 |
+| `src/cut/hand/tracker.ts` | Opens the camera, loads MediaPipe from the site, detects hands each frame; blocks MediaPipe's usage logs to Google | React | P4 |
+| `src/components/HandMode.tsx` | Gesture mode's UI: the camera window and the cursor; passes the hand's events to the easter egg's cut engine and clicks buttons it pinches | | P4 |
 | `scripts/fetch-mediapipe.mjs` | Before the build, copies the runtime and downloads and checks the model (D6) | | P4 |
 | `src/data/profile.ts` | New copy in Chinese and English, including the camera line in the privacy page | | P2–P4 |
 | Project detail page, `ProjectCard.tsx` | The detail page's header image and the shared-element transition (D7) | | P5 |
@@ -150,9 +151,19 @@ export function cutNavigate(options: {
 
 ```ts
 export function oneEuro(minCutoff: number, beta: number, dCutoff?: number): { filter(v: number, tMs: number): number; reset(): void };
+export function pinchRatio(landmarks: readonly Landmark[], aspect: number): number; // fingertip gap over palm length, corrected for the picture's aspect
 export function pinchState(prev: boolean, ratio: number): boolean; // pinched below 0.30, released above 0.45
-export function handToViewport(landmarks: readonly { x: number; y: number }[], region: Region, box: Size): Pt; // mirrored
-export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: HandFrame | null) => void): Promise<{ stop(): void }>;
+export function handToViewport(landmarks: readonly Landmark[], region: Region, box: Size): Pt; // mirrored
+// Turns one hand, frame by frame, into the same input events as a mouse (source "hand"): open is a move, a pinch is a press, opening or a hand missing for over 300 ms is a release
+export function createHandInput(options?: { region?: Region; lostMs?: number }): {
+  frame(landmarks: readonly Landmark[] | null, t: number, aspect: number, box: Size): { cursor: Pt | null; state: "none" | "open" | "pinched"; events: GestureEvent[] };
+  release(t: number): GestureEvent[]; // switching off cancels a held pinch
+  reset(): void;
+};
+// Opens the front camera, loads the runtime and model from the site's /mediapipe (GPU first, then CPU) and reports one hand's landmarks for every new video frame
+export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: HandFrame) => void, options?: { base?: string; signal?: AbortSignal; onStatus?(status: "camera" | "model" | "ready"): void }): Promise<{ stop(): void; setPaused(paused: boolean): void }>;
+// Throws HandTrackingError with reason "unsupported" | "denied" | "no-camera" | "model" | "aborted"
+export function blockUsageLogging(): void; // see §13, P4: keeps MediaPipe's usage logs from going to Google
 ```
 
 ## 6. Flow at each entrance
@@ -197,7 +208,7 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 ### 6.5 Gesture mode (Q11, Q13, D5)
 
 1. A "Try it with your hand" switch next to the viewport, shown only on computers (no coarse pointer). The camera and the model load only after it is turned on.
-2. The mapped area of the camera picture corresponds to the viewport, so the cursor stays inside it. A pinch is a press, and its events go to the viewport's `CutLayer` along the same path as the mouse. Pinching on a button clicks it.
+2. The mapped area of the camera picture corresponds to the viewport, so the cursor stays inside it. A pinch is a press, and its events go to the viewport's `CutLayer` along the same path as the mouse. Pinching on a button clicks it. A hand pauses after pinching before it sets off, so the wand waits 450 ms, while a gold ring fills around the cursor (§13, P4).
 3. Detection pauses when the viewport scrolls off screen; turning the switch off turns the camera off.
 4. The small camera window sits in a corner of the viewport and shows the skeleton, the mapped area and the state.
 
@@ -217,7 +228,7 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | Wand: start delay, longest hold, largest radius, smallest radius, settle after release | 120 ms, 1.6 s, 36% of the short side, 10% of the short side, 350 ms |
 | Click to cut | Line 120 ms, pause 40 ms, open 200 ms, expand 480 ms (D9) |
 | Step-through expansion | 780 ms |
-| D1 rule | Moving more than 10 px within 250 ms is a stroke; 40 px for hand gestures |
+| D1 rule | Moving more than 10 px within 250 ms is a stroke. Hands: 40 px; the wand waits 450 ms after a pinch, and a move still becomes a stroke within 300 ms after the wand starts |
 | Dust | At most 1,500 particles, canvas at no more than 2× pixel ratio |
 | Colors | Knife `--accent`; wand `--cat-engines` (`#fbbf6a`, Q10) |
 | Gestures | Pinch at 0.30, release at 0.45; mapped area with 12% margins left, right and top and 18% at the bottom; a hand missing for 300 ms is a release; One Euro 1.2 / 0.012 |
@@ -250,7 +261,7 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | P1 Engine | **Done 2026-11-06, awaiting review.** `geometry`, `timeline`, `gesture`, `dust`, `engine`, `fxLayer`, `constants` and their tests | ~900 | Unchanged (the new modules are not used yet) |
 | P2 Camera AR and language switch | **Done 2026-11-06, awaiting review, see §13.** `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
 | P3 404, easter egg, hint | **Done 2026-11-06, awaiting review, see §13.** The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
-| P4 Gesture mode | `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
+| P4 Gesture mode | **Done 2026-11-06, awaiting review, see §13.** `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
 | P5 Project cards | The detail page's header image and the shared-element transition | ~120 | F14 usable |
 
 About 2,600 lines in total (excluding P0), not counting tests and docs. Each phase follows skeleton → tests (Red) → implementation (Green) → verification, then stops for review and updates the status in §5 of the requirements.
@@ -336,3 +347,16 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Tried in desktop Chromium: the easter egg's hold hint, a knife cut opening the window, clicking inside to step through, Esc to return, Enter to open a window and Esc to close it with a scar; on the 404 page (static build), a stroke starting in a blank area and crossing the card, and "Back to home", both cut open and went home.
 - Not tried: the wand in these two places (the browser tool here cannot hold a press; the wand was tried on P1's test page), the hint on touch, phones, Safari and Firefox. The dev server cannot show the 404 page with `output: "export"` (as before), so it has to be tested on the static build.
 - For review: on phones the 404 card fills most of the screen, leaving little blank space to start a stroke (one can start at the edge and cross the card).
+
+### P4 (2026-11-06, awaiting review)
+
+- On the site: a "Try it with your hand" switch in the bottom right of the home page's 3D viewport, shown only on computers, where the browser can open a camera and this build has the model (Q11, Q13, D6). Only turning it on asks for the camera and loads the model. A small window in the top right shows the mirrored picture, the hand skeleton, a dashed box for the mapped region and the state (opening the camera, loading the model, no hand, open, pinched); a cursor follows the hand and shrinks to a solid gold dot when pinched, and a hint says how to use it for a few seconds. A pinch acts like a mouse press and goes to the easter egg's cut engine along the mouse's path: pinch and draw a straight line for the knife, pinch and hold for the wand, and at a window pinch inside to step through or outside to close. Pinching on a button inside the viewport clicks it (D5). Recognition pauses when the viewport scrolls off screen; turning the switch off, or opening camera AR, turns the camera off. Without a camera, without permission or when the model fails, the switch turns back off and says why.
+- New modules: `src/cut/hand/oneEuro.ts`, `pinch.ts`, `mapping.ts`, `handInput.ts` (frames to input events, pure) and `tracker.ts`; `src/components/HandMode.tsx`; `scripts/fetch-mediapipe.mjs`. New dependency: `@mediapipe/tasks-vision` 1.1.1 (exact version).
+- Build (D6): `predev` and `prebuild` run `fetch-mediapipe` first. It copies the two runtimes (with and without SIMD, about 13 MB and 12.6 MB) to `public/mediapipe/wasm/` and downloads the model (7,819,105 bytes), checking its SHA-256 and skipping the download when a good copy is there. None of this is committed. With the network cut (simulated), the script still exits normally, marks gesture mode unavailable and removes the partial file, so the home page hides the switch. ESLint skips the copied runtime.
+- Found: MediaPipe 1.1.1 creates a usage logger for every task, which posts to `https://odml.pa.googleapis.com/v1/log` every minute, with no option to turn it off (4 requests seen on P4's test page). That breaks Q12, "visitors do not connect to Google". Fix: before MediaPipe loads, `fetch` is wrapped so that this one address gets a local 403; the logger treats logging as failed and stops, and every other request goes through as before. With it, no external request was seen and recognition still worked.
+- The privacy page gains two points: the camera is used only when camera AR or "Try it with your hand" is opened, the picture is processed only in the browser and never uploaded or stored, and the model and runtime come from this site; the "hold" hint leaves a flag in local storage.
+- Tests: new `tests/cut/hand/hand.test.ts` (One Euro, the pinch check and its hysteresis, the mirrored mapping, frames to events, a release only after 300 ms without a hand, cancelling on switch-off), `fetchMediapipe.test.ts` (the SHA-256 check, the pinned version and hash, the runtime files present) and `tracker.test.ts` (the logging address answered locally, other requests passed through), plus rules for every module in `src/cut/hand` in the architecture test.
+- First-load code: gesture mode and MediaPipe download only when the switch is turned on, so the home page's first-load scripts contain neither; they are about 1.1 KB larger than in P3 (the switch and copy).
+- Tried in desktop Chromium: the switch appears; the browser built into the Claude desktop app does not let pages use the camera, so it only got as far as "camera access was blocked", turning the switch back off with the reason. On an uncommitted test page, the runtime and model loaded from this site and both GPU and CPU created a landmarker and ran one detection (about 0.2–0.8 s).
+- Your camera test (2026-11-06): good overall, but the knife and the wand were hard to tell apart: about to cut, the space often dissolved first. Cause: a pinch started the wand at once, and a move only became a stroke if it went 40 px within 250 ms of the pinch; a hand pauses after pinching before it sets off, so by then the wand had won. Change, for hands only and only with knife and wand both on: the wand waits 450 ms after a pinch, and moving more than 40 px before then is a knife stroke; once the wand has started, such a move within 300 ms still becomes a stroke (the young hole collapses). A quick pinch and release is still the wand's tap. While the wand waits, a gold ring fills around the cursor; then the cursor becomes a gold dot (wand) or a cyan dot (knife). The hint says so and stays 8 s instead of 6. Mouse and touch are unchanged. New tests in `gesture.test.ts` and `engine.test.ts`; the ring was checked in the browser by rendering the cursor by hand. Not yet tried again with the camera.
+- Not tried: phones (left out for now per Q13), Safari and Firefox.

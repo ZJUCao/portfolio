@@ -1,7 +1,9 @@
 // Input recognizer of the space-cut transitions: normalized pointer, hand and keyboard events in,
 // intents out (a wand press, a knife stroke, a tap, a key). It applies the D1 rule: a press lights
-// the wand at once, and moving further than 10 px (40 px for hands) within 250 ms turns it into a
-// knife stroke. No DOM, no React. Contract: docs/design_space_cut.md §4, §5.2.
+// the wand at once, and moving further than 10 px within 250 ms turns it into a knife stroke. A hand
+// pauses after pinching before it sets off, so for a hand the wand waits 450 ms; moving further
+// than 40 px before then, or within 300 ms after the wand started, is a stroke. No DOM, no React.
+// Contract: docs/design_space_cut.md §4, §5.2.
 
 import { GESTURE, KNIFE } from "./constants";
 import type { InputSource, Pt } from "./geometry";
@@ -43,8 +45,10 @@ type Press = {
   down: Pt;
   t0: number;
   points: Pt[];
-  /** "wand" once the wand has started; "stroke" once the press became a stroke. */
-  mode: "plain" | "wand" | "stroke";
+  /** "waiting" while a hand's wand waits; "wand" once the wand has started; "stroke" once the press became a stroke. */
+  mode: "plain" | "waiting" | "wand" | "stroke";
+  /** When the wand started (ms). */
+  wandAt: number;
 };
 
 const isHand = (source: InputSource) => source === "hand";
@@ -73,9 +77,10 @@ export function createRecognizer(tools: Tools): Recognizer {
     const p: Pt = [e.x, e.y];
     if (e.type === "down") {
       if (press) return []; // one press at a time: a second finger or pointer is ignored
-      press = { id: e.id, source: e.source, down: p, t0: e.t, points: [p], mode: tools.wand ? "wand" : "plain" };
+      const waits = tools.wand && tools.knife && isHand(e.source);
+      press = { id: e.id, source: e.source, down: p, t0: e.t, points: [p], mode: !tools.wand ? "plain" : waits ? "waiting" : "wand", wandAt: e.t };
       const out: Intent[] = [{ kind: "press", p, source: e.source }];
-      if (tools.wand) out.push({ kind: "wand-start", p, t: e.t, source: e.source });
+      if (press.mode === "wand") out.push({ kind: "wand-start", p, t: e.t, source: e.source });
       return out;
     }
     if (!press) return e.type === "move" ? [{ kind: "hover", p, source: e.source }] : [];
@@ -87,12 +92,21 @@ export function createRecognizer(tools: Tools): Recognizer {
         return [{ kind: "stroke-move", points: press.points.slice(), t: e.t }];
       }
       sample(p);
-      // D1: with the wand on, only a quick move becomes a stroke; with the knife alone, any move does
-      const far = dist(p, press.down) > (isHand(press.source) ? GESTURE.strokeMovePxHand : GESTURE.strokeMovePx);
-      const quick = !tools.wand || e.t - press.t0 <= GESTURE.strokeWindowMs;
+      // D1: with the wand on, only a quick move becomes a stroke; with the knife alone, any move does.
+      // A hand's waiting wand counts as quick, and so does its first 300 ms once started.
+      const hand = isHand(press.source);
+      const far = dist(p, press.down) > (hand ? GESTURE.strokeMovePxHand : GESTURE.strokeMovePx);
+      const quick = press.mode !== "wand" || e.t - press.wandAt <= (hand ? GESTURE.strokeWindowMsHand : GESTURE.strokeWindowMs);
       if (tools.knife && far && quick) {
         press.mode = "stroke";
         return [{ kind: "stroke-start", points: press.points.slice(), t: e.t, source: press.source }];
+      }
+      if (press.mode === "waiting" && e.t - press.t0 >= GESTURE.wandDelayMsHand) {
+        // The hand held still: the wand starts where it is now, and later moves are measured from there
+        press.mode = "wand";
+        press.wandAt = e.t;
+        press.down = p;
+        return [{ kind: "wand-start", p, t: e.t, source: press.source }];
       }
       return [];
     }
@@ -106,6 +120,8 @@ export function createRecognizer(tools: Tools): Recognizer {
       return [{ kind: "stroke-end", points: ended.points, t: e.t, source: ended.source }];
     }
     if (ended.mode === "wand") return [{ kind: "wand-end", t: e.t }];
+    // A quick pinch: the wand's tap, which opens a small window where the pinch began
+    if (ended.mode === "waiting") return [{ kind: "wand-start", p: ended.down, t: e.t, source: ended.source }, { kind: "wand-end", t: e.t }];
     const reach = isHand(ended.source) ? GESTURE.tapMovePxHand : GESTURE.tapMovePx;
     if (tools.click && dist(p, ended.down) <= reach) return [{ kind: "tap", p: ended.down, t: e.t, source: ended.source }];
     return [];

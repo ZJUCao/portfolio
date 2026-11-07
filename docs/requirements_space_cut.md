@@ -1,6 +1,6 @@
 # Requirements: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, all 13 questions in §10 settled with the recommended option (A); the design doc is confirmed too; the P0 spike is done and the language switch now has the site start the view transition itself (design doc §12, adopted), with no change to the feature itself; the P1 engine is merged; P2 (camera AR and the language switch) is merged; P3 (404, easter egg, hint) is done, awaiting review · Prototype: [神刀转场](https://claude.ai/artifact/PSnnoBieR9vYQ4p3VUNEQS) (private page; its source exists only in that published page)
+Status: **Confirmed 2026-11-06**, all 13 questions in §10 settled with the recommended option (A); the design doc is confirmed too; the P0 spike is done and the language switch now has the site start the view transition itself (design doc §12, adopted), with no change to the feature itself; the P1 engine is merged; P2 (camera AR and the language switch) is merged; P3 (404, easter egg, hint) is merged; P4 (gesture mode) is done, awaiting review · Prototype: [神刀转场](https://claude.ai/artifact/PSnnoBieR9vYQ4p3VUNEQS) (private page; its source exists only in that published page)
 
 ## 1. Goal
 
@@ -137,7 +137,7 @@ A feature is marked "done" only after it has been tried on real iPhone Safari an
 | F10 | 404 page | Usable on the site: a stroke or the wand in a blank area, or the "Back to home" buttons, cut open and go to the home page (tried the knife and the button in desktop Chromium on the static build; not on phones) |
 | F11 | Easter egg: cut open the home page's 3D viewport to see an engineering view of the 3D scene (Q6) | Usable on the site: the window shows the engineering view, stepping through swaps the two views, and cutting again or Esc swaps back (tried in desktop Chromium; phone performance not measured) |
 | F12 | New copy (hints and the like) in Chinese and English, in `src/data/profile.ts` | Hints at the window for camera AR and the easter egg, the "hold" hint, the too-short and not-straight hints, the "Engineering view" label and the viewport's accessible description, in both languages; the 404 page shows its hints in both languages side by side |
-| F13 | Hand gestures (camera): a switch on the home page, computers only at first (Q11, Q13); pinch to press, all three ways in, a cursor that follows the hand, a camera window | Playable in the prototype (only on a localhost address; tried on a PC webcam, and you found it smooth; not tried on a phone); not started in the portfolio |
+| F13 | Hand gestures (camera): a switch on the home page, computers only at first (Q11, Q13); pinch to press, all three ways in, a cursor that follows the hand, a camera window | On the site; you tried it with a webcam on a computer (2026-11-06) and it works overall. The knife and the wand were hard to tell apart, so for hands the wand now waits 450 ms, with a gold ring on the cursor (design doc §13, P4); that change has not been tried with the camera yet. Phones, Safari and Firefox not tried |
 | F14 | A header image on the project detail page (the card's image, above the title), which the card's cover grows into (a shared-element transition, Q7, D6) | Not started; not in the prototype |
 
 ## 6. Non-functional requirements
@@ -167,7 +167,7 @@ A feature is marked "done" only after it has been tried on real iPhone Safari an
 - At most, a "hint seen" flag is kept in the browser's local storage (Q5).
 - The camera is used only inside the existing camera AR and in gesture mode when a visitor turns it on. Gesture mode processes the picture only in the visitor's own browser and uploads nothing.
 - The gesture model and runtime live in the site's own files (Q12), so visitors do not connect to jsDelivr or Google for them.
-- The privacy page has to describe the camera use.
+- The privacy page has to describe the camera use. (Added in P4; P4 also found that MediaPipe posts usage logs to Google, which are now blocked before it loads, see design doc §13.)
 
 ### Devices
 - On phones, dragging and long presses work only in areas that do not scroll: the home page's 3D viewport, full-screen overlays and the 404 page (Q8), so normal scrolling and tapping are unaffected.

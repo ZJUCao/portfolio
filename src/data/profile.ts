@@ -157,6 +157,8 @@ const zh = {
       "你在导航栏选择的语言保存在你自己浏览器的本地存储里，只用来下次打开时直接显示这个语言，不会发送给任何服务器。",
       "项目卡片和项目说明里的图片直接从 GitHub 加载；如果项目页嵌入了 YouTube 或 B 站的演示视频，播放器由对应平台提供。这些服务会像你访问其他网页时一样收到请求。",
       "网站托管在 Vercel 上，Vercel 会按它自己的隐私政策保留访问日志。",
+      "摄像头只在你打开“用摄像头看 AR”或“用手试试”时使用。画面只在你自己的浏览器里处理（找标定板、识别手），不会上传，也不会保存；关掉以后摄像头随即关闭。手势识别用的 MediaPipe 运行文件和模型都放在这个网站上，加载它们不会连到 Google 或其他第三方。",
+      "首页 3D 画面里第一次出现的“按住”提示看过以后，也会在本地存储里记一个标记，下次就不再显示。",
     ],
   },
   ui: {
@@ -180,6 +182,24 @@ const zh = {
         peek: "点窗口里面或按 Enter 进去，点外面或按 Esc 合上",
         engineering: "工程视角",
         aria: "3D 取景框：划一刀或按住，可以切开空间看场景的工程视角；也可以按 Enter 在中间开窗",
+      },
+      // 手势模式：取景框右下角的开关，打开后才用摄像头（docs/design_space_cut.md §6.5）
+      hand: {
+        on: "用手试试",
+        off: "关掉手势",
+        camera: "正在打开摄像头…",
+        model: "正在加载手势模型（第一次约 11.5 MB）…",
+        none: "没看到手",
+        open: "张开",
+        pinched: "捏住",
+        preview: "手势识别的摄像头画面（镜像）",
+        hint: "捏住拇指和食指就是按下：捏住马上划直线是刀；捏住不动，等光标外的金圈转满是魔杖；捏一下再松开是点击",
+        errors: {
+          denied: "没有拿到摄像头权限，手势模式已关闭。可以在地址栏旁的网站设置里允许使用摄像头。",
+          "no-camera": "没有找到可用的摄像头，手势模式已关闭。",
+          unsupported: "这个浏览器打不开摄像头。",
+          model: "手势模型没能加载，手势模式已关闭。检查网络后再试一次。",
+        },
       },
       // 摄像头 AR：首页取景框右下角的按钮，和点开后的全屏叠层
       camera: "用摄像头看 AR",
@@ -396,6 +416,8 @@ const en: typeof zh = {
       "The language you pick in the navigation is saved in your own browser's local storage, only so the site opens in that language next time. It is never sent to a server.",
       "Images on project cards and pages load directly from GitHub. If a project page embeds a YouTube or Bilibili demo video, the player comes from that platform. These services receive the request just as they would on any other site.",
       "The site is hosted on Vercel, which keeps access logs under its own privacy policy.",
+      "The camera is used only when you open “Try camera AR” or “Try it with your hand”. The picture is processed only in your own browser (to find the calibration board or track your hand); it is never uploaded or stored, and the camera turns off when you close them. The MediaPipe runtime and model used for hand tracking are served from this site, so loading them sends no request to Google or any other third party.",
+      "Once you have seen the “hold” hint in the home page's 3D view, a flag in local storage keeps it from showing again.",
     ],
   },
   ui: {
@@ -417,6 +439,23 @@ const en: typeof zh = {
         peek: "Click inside or press Enter to step in; click outside or press Esc to close",
         engineering: "Engineering view",
         aria: "3D viewport: draw a line or press and hold to cut space open and see the scene's engineering view, or press Enter to open a window in the middle",
+      },
+      hand: {
+        on: "Try it with your hand",
+        off: "Turn off hand mode",
+        camera: "Opening the camera…",
+        model: "Loading the hand model (about 11.5 MB the first time)…",
+        none: "No hand",
+        open: "Open",
+        pinched: "Pinched",
+        preview: "Hand-tracking camera picture (mirrored)",
+        hint: "Pinch thumb and index finger to press: pinch and draw a straight line right away for the knife; pinch and hold still until the gold ring around the cursor fills for the wand; pinch and let go to click",
+        errors: {
+          denied: "Camera access was blocked, so hand mode is off. Allow the camera in this site's settings next to the address bar.",
+          "no-camera": "No camera was found, so hand mode is off.",
+          unsupported: "This browser can't open the camera.",
+          model: "The hand model didn't load, so hand mode is off. Check the connection and try again.",
+        },
       },
       camera: "Try camera AR",
       cameraAR: {

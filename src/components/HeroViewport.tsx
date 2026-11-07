@@ -5,10 +5,13 @@ import { type KeyboardEvent, type MouseEvent, useCallback, useEffect, useMemo, u
 import type { ARView, CameraARLabels } from "@/components/CameraAR";
 import { floorPath } from "@/components/CoverArt";
 import type { CutHints } from "@/components/CutLayer";
+import type { HandLabels } from "@/components/HandMode";
 import { HudCorners } from "@/components/HudCorners";
 import type { createHeroScene, XRMode } from "@/components/heroScene";
 import type { Cut, CutTarget, Phase } from "@/cut/engine";
 import type { Pt } from "@/cut/geometry";
+// 构建前由 scripts/fetch-mediapipe.mjs 写入：手势模型和运行文件准备好了没有（D6）
+import gesture from "@/data/gesture.generated.json";
 
 export type HudLabels = {
   scene: string;
@@ -21,13 +24,20 @@ export type HudLabels = {
   cameraAR: CameraARLabels;
   // 彩蛋：在取景框里切开空间，看场景的工程视角（docs/design_space_cut.md §6.4）
   cut: Required<CutHints> & { engineering: string; aria: string };
+  // 手势模式（§6.5）
+  hand: HandLabels;
 };
 
 // 摄像头 AR 的叠层连同追踪、位姿的代码，打开时才下载
 const CameraAR = dynamic(() => import("@/components/CameraAR"), { ssr: false });
 // 彩蛋的切口层连同切口引擎，3D 画面准备好以后才下载，不进首页首屏的代码
 const CutLayer = dynamic(() => import("@/components/CutLayer").then((m) => m.CutLayer), { ssr: false });
+// 手势模式连同 MediaPipe，打开开关才下载
+const HandMode = dynamic(() => import("@/components/HandMode").then((m) => m.HandMode), { ssr: false });
 const EGG_TOOLS = { knife: true, wand: true, click: false };
+const HAND_ERROR_MS = 8000;
+// 手势模式先只给电脑（Q13）：没有触屏这种粗指针
+const isComputer = () => !matchMedia("(any-pointer: coarse)").matches;
 
 // 叠层开着没有、开的是哪个画面，记在网址的 ?ar=camera 或 ?ar=board 里：按返回键能关掉，
 // 带这个参数的链接打开就直接进去（D6），其他取值不理会（OQ-58）。
@@ -85,6 +95,26 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
   const sceneRef = useRef<ReturnType<typeof createHeroScene> | null>(null);
   const cutRef = useRef<Cut | null>(null);
   const [engineering, setEngineering] = useState(false);
+  // 手势模式：模型准备好了、浏览器能开摄像头、又是电脑时才有开关；打开开关才用摄像头（Q11）
+  const computer = useSyncExternalStore(noSubscription, isComputer, () => false);
+  const canUseHand = gesture.available && canUseCamera && computer;
+  const [handOn, setHandOn] = useState(false);
+  const [handError, setHandError] = useState<string | null>(null);
+  // HandMode 要拿到取景框这个元素；用稳定的回调 ref 记进 state，渲染时不读 ref
+  const [viewportEl, setViewportEl] = useState<HTMLDivElement | null>(null);
+  const attachViewport = useCallback((element: HTMLDivElement | null) => {
+    viewportRef.current = element;
+    setViewportEl(element);
+  }, []);
+  const onHandError = useCallback((message: string) => {
+    setHandOn(false);
+    setHandError(message);
+  }, []);
+  useEffect(() => {
+    if (!handError) return;
+    const timer = setTimeout(() => setHandError(null), HAND_ERROR_MS);
+    return () => clearTimeout(timer);
+  }, [handError]);
   const portal = useMemo<CutTarget>(() => ({ setWindow: (polygon) => sceneRef.current?.setPortal(polygon) }), []);
 
   useEffect(() => {
@@ -155,6 +185,8 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
   const openCameraAR = (event: MouseEvent<HTMLButtonElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     setCutFrom([box.left + box.width / 2, box.top + box.height / 2]);
+    // 摄像头 AR 要用摄像头，手势模式先关掉
+    setHandOn(false);
     pushedAR.current = true;
     setArInUrl(matchMedia("(any-pointer: coarse)").matches ? "camera" : "board", true);
   };
@@ -210,7 +242,7 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
 
   return (
     <div
-      ref={viewportRef}
+      ref={attachViewport}
       tabIndex={0}
       role="group"
       aria-label={labels.cut.aria}
@@ -246,6 +278,13 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
           onClose={noop}
         />
       )}
+      {/* 手势模式：右上角的摄像头小窗和跟着手走的光标，捏住就像按下鼠标 */}
+      {handOn && ready && viewportEl && <HandMode viewport={viewportEl} cutRef={cutRef} labels={labels.hand} onError={onHandError} />}
+      {handError && (
+        <p role="alert" className="pointer-events-none absolute inset-x-4 bottom-16 flex justify-center text-center text-xs">
+          <span className="rounded-full bg-black/70 px-3 py-2 backdrop-blur">{handError}</span>
+        </p>
+      )}
       <HudCorners className="inset-4" />
 
       <div className="pointer-events-none absolute inset-x-6 top-4 flex items-center justify-between gap-4 text-xs text-muted sm:inset-x-8 sm:top-6">
@@ -266,6 +305,19 @@ export function HeroViewport({ labels }: { labels: HudLabels }) {
         {/* 右下角依次是摄像头 AR 和 WebXR 的按钮（D14、D9）；一个按钮都没有时才显示移动鼠标的提示 */}
         {canUseCamera || xrModes.length > 0 ? (
           <span className="pointer-events-auto flex shrink-0 flex-wrap justify-end gap-2">
+            {canUseHand && (
+              <button
+                type="button"
+                aria-pressed={handOn}
+                onClick={() => {
+                  setHandError(null);
+                  setHandOn(!handOn);
+                }}
+                className={`${buttonClass} ${handOn ? "border-accent bg-accent/15" : ""}`}
+              >
+                {handOn ? labels.hand.off : labels.hand.on}
+              </button>
+            )}
             {canUseCamera && (
               <button ref={cameraButtonRef} type="button" onClick={openCameraAR} className={buttonClass}>
                 {labels.camera}
