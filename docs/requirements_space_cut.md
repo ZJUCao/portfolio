@@ -214,6 +214,7 @@ From the existing code and docs.
 - Transitions for external links and for WebXR sessions themselves.
 - Two-handed gestures.
 - Writing our own hand tracker in this phase (the bright-spot, color or motion approaches).
+- Hand gestures on the 404 page, for now (D8).
 
 ## 9. Decided
 
@@ -226,6 +227,7 @@ From the existing code and docs.
 | D5 | Q1–Q13 in §10 all settled with the recommended option (A) | 2026-11-06 |
 | D6 | For Q7's shared-element transition, the project detail page gets a header image: the card's image, above the title (design doc OQ-2) | 2026-11-06 |
 | D7 | With hands, the wand waits 0.45 s before it starts: a hand pauses after pinching before it sets off, so a wand that started on the pinch dissolved space when the visitor meant to cut. A gold ring fills around the cursor while it waits, and moving more than 40 px meanwhile makes a knife cut. Mouse and touch are unchanged (design doc §13 P4). Tried on a webcam and found right | 2026-11-06 |
+| D8 | The 404 page gets no hand gestures for now: visitors who land there mostly want to leave, which is not worth a camera prompt plus a ~11.5 MB model download. Gesture mode stays next to the home page's 3D viewport only (Q11) | 2026-11-07 |
 
 ## 10. Resolved details
 
@@ -249,7 +251,10 @@ All settled with A on 2026-11-06 (D5).
 
 ## 11. Next steps
 
-Confirmed on 2026-11-06. Next:
+Where things stand on 2026-11-07:
 
 1. The design doc `docs/design_space_cut.md` (and its Chinese version) was written and confirmed on 2026-11-06.
-2. Build it in the design doc's phases, starting with the P0 spike, stopping for review at the end of each phase and updating the status in §5.
+2. All six phases, P0–P5, were built as the design doc lays out and merged (P5 as PR #10), each stopping for review at its end; the items left for review are all settled (design doc §13).
+3. On 2026-11-07 you tried it on the deployed site on a computer and an iPhone and found no major problems (see the start of §5).
+4. Still untried: a real Android Chrome device, Firefox, and the system's own reduce-motion setting; gesture mode (F13) was not part of that round either. You chose to leave these for now, so nothing in §5 is marked "done" yet. When they are tried, update §5 with the results.
+5. The 404 page gets no hand gestures for now (D8).
