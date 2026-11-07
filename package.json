@@ -8,11 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "fetch-github": "node scripts/fetch-github.mjs",
-    "predev": "node scripts/fetch-github.mjs",
-    "prebuild": "node scripts/fetch-github.mjs",
-    "test": "vitest run"
+    "predev": "node scripts/fetch-github.mjs && node scripts/fetch-mediapipe.mjs",
+    "prebuild": "node scripts/fetch-github.mjs && node scripts/fetch-mediapipe.mjs",
+    "test": "vitest run",
+    "fetch-mediapipe": "node scripts/fetch-mediapipe.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.1.1",
     "@phosphor-icons/react": "^2.1.10",
     "mermaid": "^12.2.0",
     "motion": "^14.6.0",

@@ -1,6 +1,6 @@
 # 设计：空间切口转场
 
-状态：**已确认（2026-11-06）**，D1–D9 和 OQ-1–OQ-5 全部采用建议；**P0 验证已完成**（§12），2026-11-06 采用 P0-1、P0-2；P1 引擎已合入（PR #5）；P2 已合入（PR #6）；**P3 已完成**（2026-11-06），待评审，见 §13 · 依据：[需求文档](requirements_space_cut.zh.md)（已确认）· 分期：P0–P5（§9）
+状态：**已确认（2026-11-06）**，D1–D9 和 OQ-1–OQ-5 全部采用建议；**P0 验证已完成**（§12），2026-11-06 采用 P0-1、P0-2；P1 引擎已合入（PR #5）；P2 已合入（PR #6）；P3 已合入（PR #7）；**P4 已完成**（2026-11-06），待评审，见 §13 · 依据：[需求文档](requirements_space_cut.zh.md)（已确认）· 分期：P0–P5（§9）
 
 ## 1. 目标
 
@@ -59,8 +59,9 @@
 | `global-not-found.tsx` 和它的客户端组件 | 404 的切口，窗里是首页的 iframe | | P3 |
 | `heroScene.ts` | 打开 stencil；彩蛋的传送门和工程视角那一遍渲染 | React | P3 |
 | `src/cut/hint.ts` | 第一次显示"按住"提示，看过以后记在本地存储里（读写都包在 try/catch 里） | React | P3 |
-| `src/cut/hand/oneEuro.ts`、`pinch.ts`、`mapping.ts` | 手势的纯函数：平滑、捏住判定（有回差）、画面坐标到取景框坐标的映射 | DOM | P4 |
-| `src/cut/hand/tracker.ts` | 打开摄像头，加载 MediaPipe，逐帧识别，把结果交给 `gesture.ts` | React | P4 |
+| `src/cut/hand/oneEuro.ts`、`pinch.ts`、`mapping.ts`、`handInput.ts` | 手势的纯函数：平滑、捏住判定（有回差）、画面坐标到取景框坐标的映射，以及逐帧把一只手变成输入事件 | DOM | P4 |
+| `src/cut/hand/tracker.ts` | 打开摄像头，从本站加载 MediaPipe，逐帧识别；拦下 MediaPipe 发给 Google 的使用日志 | React | P4 |
+| `src/components/HandMode.tsx` | 手势模式的界面：摄像头小窗、跟手的光标，把手的事件交给彩蛋的切口引擎，捏在按钮上就点它 | | P4 |
 | `scripts/fetch-mediapipe.mjs` | 构建前复制运行库、下载并校验模型（D6） | | P4 |
 | `src/data/profile.ts` | 新文案的中英文，包括隐私说明里的摄像头说明 | | P2–P4 |
 | 项目详情页、`ProjectCard.tsx` | 详情页头图和共享元素过渡（D7） | | P5 |
@@ -150,9 +151,19 @@ export function cutNavigate(options: {
 
 ```ts
 export function oneEuro(minCutoff: number, beta: number, dCutoff?: number): { filter(v: number, tMs: number): number; reset(): void };
+export function pinchRatio(landmarks: readonly Landmark[], aspect: number): number; // 指尖距离 ÷ 手掌长度，按画面宽高比修正
 export function pinchState(prev: boolean, ratio: number): boolean; // ratio < 0.30 捏住，> 0.45 松开
-export function handToViewport(landmarks: readonly { x: number; y: number }[], region: Region, box: Size): Pt; // 镜像
-export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: HandFrame | null) => void): Promise<{ stop(): void }>;
+export function handToViewport(landmarks: readonly Landmark[], region: Region, box: Size): Pt; // 镜像
+// 逐帧把一只手变成和鼠标一样的输入事件（source "hand"）：张开是移动，捏住是按下，松开或手丢了 300 ms 以上是抬起
+export function createHandInput(options?: { region?: Region; lostMs?: number }): {
+  frame(landmarks: readonly Landmark[] | null, t: number, aspect: number, box: Size): { cursor: Pt | null; state: "none" | "open" | "pinched"; events: GestureEvent[] };
+  release(t: number): GestureEvent[]; // 关掉开关时，捏着的就取消
+  reset(): void;
+};
+// 打开前置摄像头，从本站 /mediapipe 加载运行库和模型（先 GPU，不行再 CPU），每个新的视频帧报一次手的关键点
+export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: HandFrame) => void, options?: { base?: string; signal?: AbortSignal; onStatus?(status: "camera" | "model" | "ready"): void }): Promise<{ stop(): void; setPaused(paused: boolean): void }>;
+// 失败时抛 HandTrackingError，reason 是 "unsupported" | "denied" | "no-camera" | "model" | "aborted"
+export function blockUsageLogging(): void; // 见 §13 P4：不让 MediaPipe 把使用日志发给 Google
 ```
 
 ## 6. 各入口的流程
@@ -250,7 +261,7 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 | P1 引擎 | **已完成（2026-11-06），待评审。** `geometry`、`timeline`、`gesture`、`dust`、`engine`、`fxLayer`、`constants` 和测试 | ~900 | 不变（新模块还没用上） |
 | P2 摄像头 AR 和语言切换 | **已完成（2026-11-06），待评审，见 §13。** `CutLayer`、`pageCut`、`Nav`、`HeroViewport`、`CameraAR`、文案 | ~450 | F3、F8、F9 可用 |
 | P3 404、彩蛋、提示 | **已完成（2026-11-06），待评审，见 §13。** 404 的客户端组件、`heroScene` 的传送门和工程视角、`hint` | ~600 | F1、F2、F4、F7、F10、F11 可用 |
-| P4 手势模式 | `hand/*`、`fetch-mediapipe`、开关、小窗、隐私说明 | ~550 | F13 可用（只在电脑上） |
+| P4 手势模式 | **已完成（2026-11-06），待评审，见 §13。** `hand/*`、`fetch-mediapipe`、开关、小窗、隐私说明 | ~550 | F13 可用（只在电脑上） |
 | P5 项目卡片 | 详情页头图和共享元素过渡 | ~120 | F14 可用 |
 
 合计约 2,600 行（不含 P0），不含测试和文档。每期按"骨架 → 测试（Red）→ 实现（Green）→ 验证"的流程走，结束时停下来评审，并更新需求文档 §5 的状态。
@@ -336,3 +347,15 @@ export function startHandTracking(video: HTMLVideoElement, onFrame: (frame: Hand
 - 桌面 Chromium 里试过：彩蛋的"按住"提示、划一刀开窗、点窗里穿过去、Esc 回来、Enter 开窗、Esc 合上并留下切痕；404 页（静态构建）在空白处起笔划过卡片、点"Back to home"，都切开并跳到了首页。
 - 没试的：魔杖在这两处（这里的浏览器工具做不了按住不放；P1 的临时页面上试过魔杖）、触屏上的提示、手机、Safari、Firefox。开发服务器在 `output: "export"` 模式下打不开 404 页（原本就是这样），要用静态构建测。
 - 留给评审：手机上 404 页的卡片几乎占满屏幕，能起笔的空白很少（可以从边缘起笔划过卡片）。
+
+### P4（2026-11-06，待评审）
+
+- 网站上：首页 3D 取景框右下角多了"用手试试"开关，只在电脑上、浏览器能开摄像头、并且这次构建拿到了模型时出现（Q11、Q13、D6）。打开后才请求摄像头、加载模型；右上角的小窗显示镜像画面、手的骨架、映射区域的虚线框和状态（正在打开摄像头、正在加载模型、没看到手、张开、捏住）；光标跟着手走，捏住时缩成金色实心点，几秒的提示说明怎么用。捏住就像按下鼠标，和鼠标走同一条路交给彩蛋的切口引擎：捏着划直线是刀，捏住不动是魔杖，停在窗口时捏在窗里穿过去、窗外合上。捏在取景框里的按钮上就是点它（D5）。取景框滚出屏幕时停止识别；关掉开关、或者打开摄像头 AR 时摄像头随即关闭。打不开摄像头、没有权限或模型加载失败时，开关弹回，并说明原因。
+- 新增模块：`src/cut/hand/oneEuro.ts`、`pinch.ts`、`mapping.ts`、`handInput.ts`（逐帧把手变成输入事件，纯函数）、`tracker.ts`，`src/components/HandMode.tsx`，`scripts/fetch-mediapipe.mjs`。依赖加了 `@mediapipe/tasks-vision` 1.1.1（固定版本）。
+- 构建（D6）：`predev` 和 `prebuild` 先跑 `fetch-mediapipe`：把两份运行文件（支持 SIMD 和不支持的，各约 13 MB 和 12.6 MB）复制到 `public/mediapipe/wasm/`，下载模型（7,819,105 字节）并按 SHA-256 校验，已经有且校验通过就跳过。这些文件不提交。模拟断网时脚本照常退出、把标记写成不可用、删掉下了一半的文件，首页就不显示开关。ESLint 不检查复制过来的运行文件。
+- 发现的问题：MediaPipe 1.1.1 每创建一个识别任务就会建一个使用日志客户端，每分钟往 `https://odml.pa.googleapis.com/v1/log` 发一次，没有关掉的选项（P4 的临时页面上实测到 4 个请求）。这违反 Q12"访客不连 Google"。做法：加载 MediaPipe 之前包一层 `fetch`，只把这个地址就地回 403，日志客户端收到失败就停止发送；其他请求照常。加上以后实测没有任何外部请求，识别照常。
+- 隐私说明加了两条：摄像头只在打开摄像头 AR 或"用手试试"时使用，画面只在浏览器里处理、不上传不保存，模型和运行文件都由本站提供；"按住"提示会在本地存储里记一个标记。
+- 测试：新增 `tests/cut/hand/hand.test.ts`（One Euro、捏住判定和回差、镜像映射、逐帧事件、手丢了 300 ms 才算松开、关掉时取消）、`fetchMediapipe.test.ts`（SHA-256 校验、固定的版本和哈希、运行文件都在）、`tracker.test.ts`（日志地址被拦下、其他请求照常），架构测试加了 `src/cut/hand` 各模块的规则。
+- 首屏代码：手势模式和 MediaPipe 打开开关才下载，首页首屏的脚本里没有它们；首屏比 P3 多了约 1.1 KB（开关和文案）。
+- 浏览器里试过（桌面 Chromium）：开关出现；Claude 桌面版内置的浏览器不允许页面用摄像头，所以只走到了"没有拿到摄像头权限"那一步，开关弹回并说明原因。另用一个不提交的临时页面从本站加载运行文件和模型，GPU 和 CPU 都能建出识别器并跑一次识别（约 0.2–0.8 秒）。
+- 没试的：真的用摄像头和手操作（要在你自己的浏览器里试）、手机（Q13 先不给手机）、Safari、Firefox。

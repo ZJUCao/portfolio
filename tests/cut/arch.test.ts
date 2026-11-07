@@ -49,9 +49,20 @@ const RULES: Readonly<Record<string, Rule>> = {
     globals: ["document", "window", "performance", "requestAnimationFrame", "cancelAnimationFrame"],
     globalScopes: /^(ensureLayer|arrival|cutNavigate)$/,
   },
+  // P4: the hand modules in src/cut/hand. All pure but the tracker, which opens the camera and
+  // loads MediaPipe from the site's own files
+  oneEuro: PURE,
+  mapping: PURE,
+  pinch: { runtime: ["cut/constants"], globals: [] },
+  handInput: { runtime: ["cut/constants", "cut/hand/mapping", "cut/hand/oneEuro", "cut/hand/pinch"], globals: [] },
+  tracker: {
+    runtime: ['package "@mediapipe/tasks-vision"'],
+    globals: ["navigator", "performance", "requestAnimationFrame", "cancelAnimationFrame"],
+    globalScopes: /^startHandTracking$/,
+  },
 };
 
-const scans = (): ModuleScan[] => scanDirectory(CUT_DIR, BROWSER_GLOBALS).filter((scan) => !scan.path.includes(`${join("cut", "hand")}`));
+const scans = (): ModuleScan[] => scanDirectory(CUT_DIR, BROWSER_GLOBALS);
 const where = (scan: ModuleScan, line: number) => `src/cut/${scan.name}.ts:${line}`;
 
 describe("architecture of src/cut (§4)", () => {

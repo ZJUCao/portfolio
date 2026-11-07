@@ -42,3 +42,7 @@ next-env.d.ts
 
 # generated at build time by scripts/fetch-github.mjs
 /src/data/github.generated.json
+
+# copied and downloaded before builds by scripts/fetch-mediapipe.mjs (gesture mode)
+/public/mediapipe/
+/src/data/gesture.generated.json

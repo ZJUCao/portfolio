@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Claude Code 会把会话的 worktree 建在 .claude/worktrees 里，那是另一份仓库副本和它的构建产物
     ".claude/**",
+    // 构建前从 node_modules 复制过来的 MediaPipe 运行文件（scripts/fetch-mediapipe.mjs），是第三方代码
+    "public/mediapipe/**",
   ]),
 ]);
 

@@ -152,3 +152,20 @@ export const COLORS = Object.freeze({
   wand: "var(--cat-engines, #fbbf6a)",
   wandCore: "#fff3d6",
 });
+
+/** Hand gestures (§3.5 of the requirements, D5): one hand, a pinch of thumb and index finger is a press. */
+export const HAND = Object.freeze({
+  /** Fingertip distance over palm length: pinched below pinchOn, released above pinchOff. */
+  pinchOn: 0.3,
+  pinchOff: 0.45,
+  /** The part of the camera picture that maps onto the viewport: 12% margins left, right and top, 18% at the bottom. */
+  region: Object.freeze({ x0: 0.12, x1: 0.88, y0: 0.12, y1: 0.82 }),
+  /** A hand missing longer than this counts as a release. */
+  lostMs: 300,
+  /** One Euro filter on the cursor. */
+  minCutoff: 1.2,
+  beta: 0.012,
+  dCutoff: 1,
+  /** The pointer id the hand's events carry, apart from any mouse or touch. */
+  pointerId: 7001,
+});
