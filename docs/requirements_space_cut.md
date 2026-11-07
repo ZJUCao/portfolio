@@ -90,10 +90,10 @@ Keyboard only (Q4): with focus on an entrance, Enter or Space opens a medium win
 - The picture is mirrored, like a mirror.
 - One hand:
   - Pinching thumb and index finger together is a press; letting go is a release.
-  - A ring cursor follows the midpoint of the two fingertips and shrinks to a solid dot while pinched.
+  - A ring cursor follows the midpoint of the two fingertips. After a pinch, until the wand starts, a gold ring fills around it; once settled it shrinks to a solid dot, gold for the wand and cyan for the knife.
 - All three ways in work:
-  - Pinch and draw a straight line to make a knife cut.
-  - Pinch and hold to hold the wand.
+  - Pinch and draw a straight line right away to make a knife cut.
+  - Pinch and hold still: the wand starts after 0.45 s, and keeping the pinch holds the wand (D7).
   - Pinch and let go to click.
   - Once a window is open, a pinch inside it steps through and a pinch outside closes it.
 - The middle of the camera picture (12% margins left, right and top, 18% at the bottom) maps to the whole screen, so the hand never has to reach the edge of the frame.
@@ -223,6 +223,7 @@ From the existing code and docs.
 | D4 | Add hand gestures (camera): pinching thumb and index finger is a press. Tried on a PC webcam and found smooth | 2026-11-06 |
 | D5 | Q1–Q13 in §10 all settled with the recommended option (A) | 2026-11-06 |
 | D6 | For Q7's shared-element transition, the project detail page gets a header image: the card's image, above the title (design doc OQ-2) | 2026-11-06 |
+| D7 | With hands, the wand waits 0.45 s before it starts: a hand pauses after pinching before it sets off, so a wand that started on the pinch dissolved space when the visitor meant to cut. A gold ring fills around the cursor while it waits, and moving more than 40 px meanwhile makes a knife cut. Mouse and touch are unchanged (design doc §13 P4). Tried on a webcam and found right | 2026-11-06 |
 
 ## 10. Resolved details
 
