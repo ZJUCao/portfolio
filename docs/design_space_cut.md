@@ -1,6 +1,6 @@
 # Design: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); P3 is merged (PR #7); **P4 is done** (2026-11-06), awaiting review, see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
+Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); P3 is merged (PR #7); P4 is merged (PR #8), see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
 
 ## 1. Goal
 
@@ -258,10 +258,10 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | Phase | Contents | Lines changed (est.) | Site after this phase |
 | :--- | :--- | :--- | :--- |
 | P0 Spike | **Done 2026-11-06, results in §12.** On a branch that is never merged, check four things: whether Web Animations can drive the `clip-path` of `::view-transition-new` inside a view transition; whether `<ViewTransition>` fires `onEnter` on a language switch (the root layout's param changes, so the page should remount); whether a named effect layer is live during the transition; and the three.js stencil portal | ~150, thrown away | Unchanged |
-| P1 Engine | **Done 2026-11-06, awaiting review.** `geometry`, `timeline`, `gesture`, `dust`, `engine`, `fxLayer`, `constants` and their tests | ~900 | Unchanged (the new modules are not used yet) |
-| P2 Camera AR and language switch | **Done 2026-11-06, awaiting review, see §13.** `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
-| P3 404, easter egg, hint | **Done 2026-11-06, awaiting review, see §13.** The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
-| P4 Gesture mode | **Done 2026-11-06, awaiting review, see §13.** `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
+| P1 Engine | **Merged 2026-11-06 (PR #5).** `geometry`, `timeline`, `gesture`, `dust`, `engine`, `fxLayer`, `constants` and their tests | ~900 | Unchanged (the new modules are not used yet) |
+| P2 Camera AR and language switch | **Merged 2026-11-06 (PR #6), see §13.** `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
+| P3 404, easter egg, hint | **Merged 2026-11-06 (PR #7), see §13.** The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
+| P4 Gesture mode | **Merged 2026-11-06 (PR #8), see §13.** `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
 | P5 Project cards | The detail page's header image and the shared-element transition | ~120 | F14 usable |
 
 About 2,600 lines in total (excluding P0), not counting tests and docs. Each phase follows skeleton → tests (Red) → implementation (Green) → verification, then stops for review and updates the status in §5 of the requirements.
@@ -322,7 +322,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 
 ## 13. Progress
 
-### P2 (2026-11-06, awaiting review)
+### P2 (2026-11-06, merged as PR #6)
 
 - On the site: the language switch and "Try camera AR" now cut space open. The code is in `src/cut/pageCut.ts` and `src/components/CutLayer.tsx`, with changes to `Nav.tsx`, `HeroViewport.tsx`, `CameraAR.tsx`, `globals.css` and `profile.ts`.
 - While camera AR waits at the window, a hint line sits at the bottom of the screen (new copy `cameraAR.peekHint`); if the window size changes at that point, the overlay opens fully; the home page's 3D scene keeps running until the overlay covers the screen.
@@ -336,7 +336,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Seen, for review: on a desktop the window opens at the button, which falls on the board view's black margin, so the window shows only black.
 - When testing: after switching Git branches the dev server may stop noticing changes to `globals.css` and keep serving the old styles; restarting it fixes that.
 
-### P3 (2026-11-06, awaiting review)
+### P3 (2026-11-06, merged as PR #7)
 
 - On the site: the easter egg in the home page's 3D viewport and the 404 page can now be cut. New: `src/cut/hint.ts` and `src/components/NotFoundCut.tsx`; changed: `heroScene.ts` (the stencil portal and the engineering view), `HeroViewport.tsx`, `CutLayer.tsx`, `global-not-found.tsx` and `profile.ts`.
 - Easter egg: draw a line or hold the wand in the viewport and the window shows the engineering view (a dark blueprint background and grid, normal shading, wireframes, and an amber bounding box and local axes on every part). Clicking inside or Enter steps through, the two views swap and the HUD says "Engineering view"; cutting again swaps back, and Esc returns straight to the normal view. The viewport takes Tab focus, and Enter or Space opens a window at its center. The camera stops following the pointer while drawing or dissolving; at the window it follows as usual, turning both views together in place of parallax. The HUD's bottom row no longer catches the pointer, only its buttons do, so a stroke can start next to them.
@@ -348,7 +348,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Not tried: the wand in these two places (the browser tool here cannot hold a press; the wand was tried on P1's test page), the hint on touch, phones, Safari and Firefox. The dev server cannot show the 404 page with `output: "export"` (as before), so it has to be tested on the static build.
 - For review: on phones the 404 card fills most of the screen, leaving little blank space to start a stroke (one can start at the edge and cross the card).
 
-### P4 (2026-11-06, awaiting review)
+### P4 (2026-11-06, merged as PR #8)
 
 - On the site: a "Try it with your hand" switch in the bottom right of the home page's 3D viewport, shown only on computers, where the browser can open a camera and this build has the model (Q11, Q13, D6). Only turning it on asks for the camera and loads the model. A small window in the top right shows the mirrored picture, the hand skeleton, a dashed box for the mapped region and the state (opening the camera, loading the model, no hand, open, pinched); a cursor follows the hand and shrinks to a solid gold dot when pinched, and a hint says how to use it for a few seconds. A pinch acts like a mouse press and goes to the easter egg's cut engine along the mouse's path: pinch and draw a straight line for the knife, pinch and hold for the wand, and at a window pinch inside to step through or outside to close. Pinching on a button inside the viewport clicks it (D5). Recognition pauses when the viewport scrolls off screen; turning the switch off, or opening camera AR, turns the camera off. Without a camera, without permission or when the model fails, the switch turns back off and says why.
 - New modules: `src/cut/hand/oneEuro.ts`, `pinch.ts`, `mapping.ts`, `handInput.ts` (frames to input events, pure) and `tracker.ts`; `src/components/HandMode.tsx`; `scripts/fetch-mediapipe.mjs`. New dependency: `@mediapipe/tasks-vision` 1.1.1 (exact version).
@@ -358,5 +358,5 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Tests: new `tests/cut/hand/hand.test.ts` (One Euro, the pinch check and its hysteresis, the mirrored mapping, frames to events, a release only after 300 ms without a hand, cancelling on switch-off), `fetchMediapipe.test.ts` (the SHA-256 check, the pinned version and hash, the runtime files present) and `tracker.test.ts` (the logging address answered locally, other requests passed through), plus rules for every module in `src/cut/hand` in the architecture test.
 - First-load code: gesture mode and MediaPipe download only when the switch is turned on, so the home page's first-load scripts contain neither; they are about 1.1 KB larger than in P3 (the switch and copy).
 - Tried in desktop Chromium: the switch appears; the browser built into the Claude desktop app does not let pages use the camera, so it only got as far as "camera access was blocked", turning the switch back off with the reason. On an uncommitted test page, the runtime and model loaded from this site and both GPU and CPU created a landmarker and ran one detection (about 0.2–0.8 s).
-- Your camera test (2026-11-06): good overall, but the knife and the wand were hard to tell apart: about to cut, the space often dissolved first. Cause: a pinch started the wand at once, and a move only became a stroke if it went 40 px within 250 ms of the pinch; a hand pauses after pinching before it sets off, so by then the wand had won. Change, for hands only and only with knife and wand both on: the wand waits 450 ms after a pinch, and moving more than 40 px before then is a knife stroke; once the wand has started, such a move within 300 ms still becomes a stroke (the young hole collapses). A quick pinch and release is still the wand's tap. While the wand waits, a gold ring fills around the cursor; then the cursor becomes a gold dot (wand) or a cyan dot (knife). The hint says so and stays 8 s instead of 6. Mouse and touch are unchanged. New tests in `gesture.test.ts` and `engine.test.ts`; the ring was checked in the browser by rendering the cursor by hand. Not yet tried again with the camera.
+- Your camera test (2026-11-06): good overall, but the knife and the wand were hard to tell apart: about to cut, the space often dissolved first. Cause: a pinch started the wand at once, and a move only became a stroke if it went 40 px within 250 ms of the pinch; a hand pauses after pinching before it sets off, so by then the wand had won. Change, for hands only and only with knife and wand both on: the wand waits 450 ms after a pinch, and moving more than 40 px before then is a knife stroke; once the wand has started, such a move within 300 ms still becomes a stroke (the young hole collapses). A quick pinch and release is still the wand's tap. While the wand waits, a gold ring fills around the cursor; then the cursor becomes a gold dot (wand) or a cyan dot (knife). The hint says so and stays 8 s instead of 6. Mouse and touch are unchanged. New tests in `gesture.test.ts` and `engine.test.ts`; the ring was checked in the browser by rendering the cursor by hand. You tried it again with the camera and found the 450 ms wait right.
 - Not tried: phones (left out for now per Q13), Safari and Firefox.
