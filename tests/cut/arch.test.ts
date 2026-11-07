@@ -49,6 +49,10 @@ const RULES: Readonly<Record<string, Rule>> = {
     globals: ["document", "window", "performance", "requestAnimationFrame", "cancelAnimationFrame"],
     globalScopes: /^(ensureLayer|arrival|cutNavigate)$/,
   },
+  // P5: the names of the card-to-detail morph; the <ViewTransition>s that use them live in src/components
+  coverMorph: PURE,
+  // Back and Forward for the morph: the path being left and the arrival flag; src/instrumentation-client.ts adds the type
+  coverHistory: { runtime: ["cut/coverMorph"], globals: [] },
   // P4: the hand modules in src/cut/hand. All pure but the tracker, which opens the camera and
   // loads MediaPipe from the site's own files
   oneEuro: PURE,

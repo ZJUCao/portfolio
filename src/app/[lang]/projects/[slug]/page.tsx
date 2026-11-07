@@ -1,8 +1,10 @@
 import { ArrowLeft, ArrowRight, ArrowUpRight, Star } from "@phosphor-icons/react/ssr";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CoverLink } from "@/components/CoverLink";
 import { HudCorners } from "@/components/HudCorners";
 import { languageColor, LanguageDot } from "@/components/LanguageDot";
+import { ProjectCover } from "@/components/ProjectCover";
 import { Readme } from "@/components/Readme";
 import { Reveal } from "@/components/Reveal";
 import { contentFor } from "@/data/profile";
@@ -41,17 +43,23 @@ export default async function ProjectPage({ params }: PageProps<"/[lang]/project
     // --tint：项目所属分类的颜色，和卡片上的一样
     <article style={{ "--tint": `var(--cat-${project.category.id})` } as React.CSSProperties}>
       <Reveal>
-        <Link
+        {/* 回到项目列表时头图缩回卡片（docs/design_space_cut.md §6.6）；浏览器的后退、前进见 src/instrumentation-client.ts */}
+        <CoverLink
           href={`/${lang}/projects`}
           className="inline-flex items-center gap-2 text-sm font-semibold text-muted transition-colors hover:text-foreground"
         >
           <ArrowLeft aria-hidden size={16} />
           {c.ui.backToProjects}
-        </Link>
+        </CoverLink>
       </Reveal>
 
       <header className="mt-8">
-        <Reveal delay={0.04}>
+        {/* 头图（需求 D6）：卡片上的同一张图，和卡片封面一样 16:10，宽度不超过下面的简介。从卡片点进来时卡片封面放大成它，
+            所以它不在 Reveal 里（docs/design_space_cut.md §6.6） */}
+        <div className="panel relative aspect-[16/10] w-full max-w-2xl overflow-hidden rounded-3xl bg-background">
+          <ProjectCover project={project} alt={c.ui.coverAlt(project.title)} className="rounded-[calc(1.5rem-1px)]" priority />
+        </div>
+        <Reveal delay={0.04} className="mt-8">
           <Link
             href={`/${lang}/projects?category=${project.category.id}`}
             className="inline-flex items-center gap-2 text-sm font-semibold text-(--tint) hover:underline"
