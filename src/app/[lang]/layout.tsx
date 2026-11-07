@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
+import { CoverHistory } from "@/components/CoverHistory";
 import { MotionProvider } from "@/components/MotionProvider";
 import { Nav } from "@/components/Nav";
 import { contentFor } from "@/data/profile";
@@ -54,6 +55,8 @@ export default async function LangLayout({ children, params }: LayoutProps<"/[la
           {c.ui.skip}
         </a>
         <MotionProvider>
+          {/* 后退、前进进出项目详情页时，封面也放大缩小（src/instrumentation-client.ts） */}
+          <CoverHistory />
           <Nav
             locale={c.locale}
             name={c.name}

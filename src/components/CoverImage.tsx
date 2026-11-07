@@ -17,15 +17,18 @@ function fit(img: HTMLImageElement | null) {
   img.style.opacity = "1";
 }
 
-export function CoverImage({ src, alt }: { src: string; alt: string }) {
+// priority：详情页的头图在首屏，立刻加载；卡片上的封面等滚到附近再加载
+export function CoverImage({ src, alt, priority = false }: { src: string; alt: string; priority?: boolean }) {
   return (
-    // 静态导出没有图片优化服务，直接用原图地址。图片在 React 接管页面前就加载完时 onLoad 不会触发，由 ref 补上
+    // 静态导出没有图片优化服务，直接用原图地址。图片在 React 接管页面前就加载完时 onLoad 不会触发，由 ref 补上。
+    // 从卡片进详情页时图片已在缓存里，ref 挂上时就已加载完，头图一出现就不透明，过渡截下的新画面里有图
     // eslint-disable-next-line @next/next/no-img-element
     <img
       ref={fit}
       src={src}
       alt={alt}
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      fetchPriority={priority ? "high" : undefined}
       decoding="async"
       onLoad={(event) => fit(event.currentTarget)}
       style={{ opacity: 0 }}

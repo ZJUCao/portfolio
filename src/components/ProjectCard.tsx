@@ -1,9 +1,7 @@
 import { ArrowRight, Star } from "@phosphor-icons/react/ssr";
-import Link from "next/link";
-import { CoverArt } from "@/components/CoverArt";
-import { CoverImage } from "@/components/CoverImage";
-import { HudCorners } from "@/components/HudCorners";
+import { CoverLink } from "@/components/CoverLink";
 import { LanguageDot } from "@/components/LanguageDot";
+import { ProjectCover } from "@/components/ProjectCover";
 import { Tilt } from "@/components/Tilt";
 import type { Content } from "@/data/profile";
 import { formatMonth, type Project } from "@/data/projects";
@@ -18,23 +16,21 @@ export function ProjectCard({ project, c }: { project: Project; c: Content }) {
 
   return (
     <Tilt className="h-full">
-      <Link
+      {/* CoverLink：这次跳转里封面放大成详情页的头图（docs/design_space_cut.md §6.6） */}
+      <CoverLink
         href={`/${c.locale}/projects/${project.slug}`}
         style={{ "--tint": `var(--cat-${project.category.id})` } as React.CSSProperties}
         className="panel group relative flex h-full flex-col overflow-hidden rounded-3xl bg-surface transition hover:border-[color-mix(in_srgb,var(--tint)_55%,transparent)] hover:bg-raised active:scale-[0.98]"
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-background">
-          {project.cover ? (
-            <CoverImage src={project.cover} alt={c.ui.coverAlt(project.title)} />
-          ) : (
-            <CoverArt category={project.category.id} />
-          )}
-          <HudCorners className="inset-3 opacity-70" color="var(--tint)" />
-          {/* 离卡片圆角 16px，圆角取 24 − 16 = 8px */}
-          <span className="absolute left-4 top-4 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-xs text-foreground backdrop-blur">
-            <span aria-hidden className="size-2 shrink-0 rounded-full bg-(--tint)" />
-            <span className="truncate">{project.category.label}</span>
-          </span>
+          {/* 上面两角的圆角和卡片描边里面的一样：24px − 1px 描边 */}
+          <ProjectCover project={project} alt={c.ui.coverAlt(project.title)} className="rounded-t-[calc(1.5rem-1px)]">
+            {/* 离卡片圆角 16px，圆角取 24 − 16 = 8px */}
+            <span className="absolute left-4 top-4 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-lg bg-black/60 px-2 py-1 text-xs text-foreground backdrop-blur">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-(--tint)" />
+              <span className="truncate">{project.category.label}</span>
+            </span>
+          </ProjectCover>
         </div>
         <div className="flex flex-1 flex-col p-6">
           <div className="flex items-center justify-between gap-4">
@@ -68,7 +64,7 @@ export function ProjectCard({ project, c }: { project: Project; c: Content }) {
             </span>
           </div>
         </div>
-      </Link>
+      </CoverLink>
     </Tilt>
   );
 }

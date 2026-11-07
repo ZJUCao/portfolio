@@ -214,6 +214,37 @@ html:active-view-transition-type(cut-fade)::view-transition-new(root) {
   z-index: 10;
 }
 
+/* 项目卡片到详情页（docs/design_space_cut.md §6.6、D7）：带 cover 类型的跳转由 React 发起视图过渡，
+   只有配成一对的封面（src/cut/coverMorph.ts 的 cover-morph）从旧位置放大或缩小到新位置，页面其余部分直接换掉。
+   React 通常自己就不截整页（把 html 的过渡名设成 none）；万一截了，切口以外的过渡里整页也不淡入淡出、过渡层不接住指针，
+   和以前一样快 */
+html:not(:active-view-transition-type(cut, cut-fade))::view-transition-group(root),
+html:not(:active-view-transition-type(cut, cut-fade))::view-transition-old(root),
+html:not(:active-view-transition-type(cut, cut-fade))::view-transition-new(root) {
+  animation: none;
+}
+/* 封面飞过去的时候页面照常能点 */
+html:not(:active-view-transition-type(cut, cut-fade))::view-transition {
+  pointer-events: none;
+}
+::view-transition-group(.cover-morph) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* 两边宽高比一样；万一不一样，新旧两张截图都按 cover 铺满正在变化的框，不会变形 */
+::view-transition-old(.cover-morph),
+::view-transition-new(.cover-morph) {
+  height: 100%;
+  object-fit: cover;
+}
+/* 减少动态效果时封面不移动也不缩放：直接在新位置，新旧两张淡入淡出 200 ms */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(.cover-morph) {
+    animation-name: none;
+    animation-duration: 200ms;
+  }
+}
+
 /* 手势模式：捏住以后光标外圈的金色在魔杖开始前转满（HandMode.tsx，时长是 GESTURE.wandDelayMsHand） */
 @keyframes hand-wait {
   from {
