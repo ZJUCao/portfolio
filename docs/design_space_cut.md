@@ -339,7 +339,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
   - Reduce motion (the system setting simulated by script): the language switch crossfades instead.
   - Camera AR (the board view on a desktop): a click and Enter both cut from the button and stop; clicking inside or Enter steps through; clicking outside or Esc closes it and the overlay, the URL goes back and focus returns to the button.
 - Not tried: phones (including "Opening the camera" in the middle of the window and the view fading in), Safari, Firefox.
-- Seen, for review: on a desktop the window opens at the button, which falls on the board view's black margin, so the window shows only black.
+- Seen, settled in review (2026-11-07): on a desktop the window opens at the button, which falls on the board view's black margin, so the window shows only black. You tried it and found no problem, so it stays.
 - When testing: after switching Git branches the dev server may stop noticing changes to `globals.css` and keep serving the old styles; restarting it fixes that.
 
 ### P3 (2026-11-06, merged as PR #7)
@@ -352,7 +352,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - First-load code: the easter egg's cut layer downloads once the 3D scene is ready, so the home page's first-load scripts contain no cut code; they are about 1.3 KB larger than in P2 (the viewport's keyboard handling and the new copy).
 - Tried in desktop Chromium: the easter egg's hold hint, a knife cut opening the window, clicking inside to step through, Esc to return, Enter to open a window and Esc to close it with a scar; on the 404 page (static build), a stroke starting in a blank area and crossing the card, and "Back to home", both cut open and went home.
 - Not tried: the wand in these two places (the browser tool here cannot hold a press; the wand was tried on P1's test page), the hint on touch, phones, Safari and Firefox. The dev server cannot show the 404 page with `output: "export"` (as before), so it has to be tested on the static build.
-- For review: on phones the 404 card fills most of the screen, leaving little blank space to start a stroke (one can start at the edge and cross the card).
+- Settled in review (2026-11-07): on phones the 404 card fills most of the screen, leaving little blank space to start a stroke (one can start at the edge and cross the card). You tried it on an iPhone and found no problem, so it stays.
 
 ### P4 (2026-11-06, merged as PR #8)
 
@@ -395,7 +395,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
   - An emulated phone width of 375 px: the morph plays, the header image is full width, no horizontal scroll (before the Back change; not repeated).
   - Reduce motion: the rule inside `@media (prefers-reduced-motion: reduce)` injected by script, since the pane cannot emulate the media query for CSS (before the Back change; not repeated).
 - Not tried: phones (including Back by swiping), Safari, Firefox, the system's own reduce-motion setting, the deployed site (deployed with PR #10, not tried there), and clicking more than 5 minutes after loading.
-- For review: the header image keeps the card's 16:10, so the morph is a pure scale and the side-by-side screenshots keep the card's crop of their right half. On a desktop that makes it 420 px tall above the title.
+- Settled in review (2026-11-07): the header image keeps the card's 16:10, so the morph is a pure scale and the side-by-side screenshots keep the card's crop of their right half. On a desktop that makes it 420 px tall above the title. You looked at it on the deployed site and found the size right, so it stays.
 - When testing the static build: serve the per-segment prefetch paths the way Vercel does (above), or the morph is skipped once the page has been open for a while.
 
 ### Your acceptance round (2026-11-07)
