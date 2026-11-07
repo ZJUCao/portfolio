@@ -221,6 +221,7 @@ The card's cover and the detail page's header image are the same component, `Pro
 2. The two ends pair only in navigations of the transition type `cover`. Those are the card's link and the detail page's "All projects" link (`CoverLink`), and the browser's Back and Forward into or out of a detail page within one language (a `popstate` listener in `src/instrumentation-client.ts`). Header links, the language switch, and Back and Forward anywhere else carry no such type and switch plainly (Q7). With a plain `share`, every cover would also pair with itself when the projects page swaps in its list after loading, and would sit at full brightness above its still-transparent card.
 3. Going back to the list plays it in reverse. The page a cover shrinks into shows its `Reveal`s at once instead of fading them in, so the card is fully shown when the cover lands.
 4. The morph takes 400 ms. With reduce motion on, the cover is already in place and crossfades for 200 ms.
+5. A cover that is entirely outside the viewport when the navigation starts does not morph: React leaves an out-of-view element out of the transition, so the page switches plainly. This happens when the page is scrolled so that only a card's title and summary show, which is easy on the home page's large featured cards, and for "All projects" when the card is off screen on the list. Kept on purpose (your decision, 2026-11-07, §13 P5): with the cover off screen there is nothing in view to grow from.
 
 ## 7. Parameters
 
@@ -382,7 +383,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Found:
   - React starts no view transition for a navigation in which no pair forms (header links, previous and next project, Back between card pages), so everyday navigation is exactly as it was. For the morph, React itself leaves the page root out (it sets `<html>`'s `view-transition-name` to `none`), so the rest of the page switches at once. `globals.css` also turns off the root's crossfade for every transition but `cut` and `cut-fade`, as a fallback.
   - The language switch is unchanged: one transition of type `cut`, with the header image not lifted out of the page (tried on the projects and detail pages, on the dev server and the static build).
-  - The morph needs the new page in the same commit as the navigation. Vercel serves the per-segment prefetch files (`…/__next.$d$lang.projects.$d$slug.__PAGE__.txt` returns 200 on yu-cao.vercel.app). The local static server used since P2 answers them with 404. Then Next fetches the whole page on click and, when the prefetch was about 20 s old, first commits a blank page, so no pair forms and the switch is plain. With a local server that maps those paths as Vercel does, the morph played 25 s after loading too. Prefetches go stale after 5 minutes (Next's default), after which the same may happen; not tried.
+  - The morph needs the new page in the same commit as the navigation. Vercel serves the per-segment prefetch files (`…/__next.$d$lang.projects.$d$slug.__PAGE__.txt` returns 200 on yu-cao.vercel.app). The local static server used since P2 answers them with 404. Then Next fetches the whole page on click and, when the prefetch was about 20 s old, first commits a blank page, so no pair forms and the switch is plain. With a local server that maps those paths as Vercel does, the morph played 25 s after loading too. Prefetches go stale after 5 minutes (Next's default); that turned out not to stop the morph (see "The 5-minute report" below).
   - On the dev server, editing `CoverHistory`-related modules makes Fast Refresh reload the whole page; nothing to do with the site itself.
 - Tests: `tests/cut/coverMorph.test.ts`: a valid, distinct name for any repository name; pairing only under `cover`; which traversals morph (detail page to the list or home and back, not between two detail pages, two card pages or two languages); both ends use `ProjectCover` and `CoverLink`, which carries the type; the header image is outside any `Reveal`; `globals.css` keeps the cut's rules, excludes the cut's types from the root rule and stills the morph under reduce motion. `tests/cut/coverHistory.test.ts`: the Back listener's decision follows the page on screen and does nothing before `CoverHistory` has mounted; the arrival flag is raised by Back onto a card page, not by Forward onto a detail page, and lapses on its own. Plus `coverMorph` and `coverHistory` rules in the architecture test.
 - First-load code: every page gains the small `popstate` listener and `CoverHistory`, and `Reveal` and `CoverImage` grew a little. Not measured against `main`.
@@ -394,8 +395,22 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
   - The language switch on the projects and detail pages: the cut as before.
   - An emulated phone width of 375 px: the morph plays, the header image is full width, no horizontal scroll (before the Back change; not repeated).
   - Reduce motion: the rule inside `@media (prefers-reduced-motion: reduce)` injected by script, since the pane cannot emulate the media query for CSS (before the Back change; not repeated).
-- Not tried: phones (including Back by swiping), Safari, Firefox, the system's own reduce-motion setting, the deployed site (deployed with PR #10, not tried there), and clicking more than 5 minutes after loading.
+- Not tried: phones (including Back by swiping), Safari, Firefox, the system's own reduce-motion setting, the deployed site (deployed with PR #10, not tried there), and clicking more than 5 minutes after loading (tried on 2026-11-07, see below).
 - Settled in review (2026-11-07): the header image keeps the card's 16:10, so the morph is a pure scale and the side-by-side screenshots keep the card's crop of their right half. On a desktop that makes it 420 px tall above the title. You looked at it on the deployed site and found the size right, so it stays.
+- The 5-minute report (2026-11-07): on the deployed site, after visiting other pages for about 5 minutes and coming back to the home page, you clicked a featured card in Chrome or Edge on a computer and it switched plainly, once.
+  - Expiry is not the cause. Next writes the stale time into the per-segment prefetch files (300 s, from `experimental.staleTimes.static`). After it passes, a click makes Next fetch the whole page, and React holds the navigation until it arrives, so the covers still pair; the click only waits for one request (about 150 ms on the deployed site). Coming back to the home page also prefetches its featured cards again.
+  - Tried in desktop Chromium, and every case morphed:
+    - On the deployed site: the projects page, clicked after it had been open for 5 min 35 s.
+    - On a local static build, with the stale time lowered to 30 s and every `.txt` delayed by 0.6–0.9 s:
+      - a click after expiry, with and without hovering first;
+      - hovering for 1 s first, while Next was prefetching again;
+      - after hiding the tab;
+      - featured cards after a language switch;
+      - wandering Projects → a detail page → About → Contact → home, then clicking a featured card;
+      - "All projects" after 19 minutes;
+      - Back and Forward.
+  - What does switch plainly every time: a card whose cover is entirely outside the viewport when clicked, for example scrolled so that only its title and summary show. React measures each element before naming it and leaves out one that is not in the viewport (`rect.bottom >= 0 && rect.top <= innerHeight`), so no pair forms. The detail page's end is fine: React measures the header after Next has scrolled to the top (seen with the home page scrolled to 2417 px). The home page's featured cards are large (two columns, with a cover about 290 px tall), so this is easy to hit there, and it is the likely cause of what you saw.
+  - Your decision (2026-11-07): keep the plain switch in that case (§6.6, item 5). No code changed.
 - When testing the static build: serve the per-segment prefetch paths the way Vercel does (above), or the morph is skipped once the page has been open for a while.
 
 ### Your acceptance round (2026-11-07)
