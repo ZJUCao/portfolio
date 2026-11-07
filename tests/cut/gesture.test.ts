@@ -53,11 +53,6 @@ describe("D1: the wand lights at once, a quick move makes it a knife stroke", ()
     expect(g.kinds()).toEqual(["press", "wand-start", "wand-end"]);
   });
 
-  it("hands get 40 px before a press becomes a stroke", () => {
-    expect(press(ALL, "hand").down(100, 100).move(130, 100, 100).up(130, 100, 400).kinds()).toEqual(["press", "wand-start", "wand-end"]);
-    expect(press(ALL, "hand").down(100, 100).move(145, 100, 100).kinds()).toEqual(["press", "wand-start", "stroke-start"]);
-  });
-
   it("drops points closer than 1.5 px to the previous one", () => {
     const g = press(ALL).down(0, 0).move(20, 0, 10).move(21, 0, 20).move(23, 0, 30).up(23, 0, 40);
     const end = g.out.at(-1) as Extract<Intent, { kind: "stroke-end" }>;
@@ -66,6 +61,51 @@ describe("D1: the wand lights at once, a quick move makes it a knife stroke", ()
       [20, 0],
       [23, 0],
     ]);
+  });
+});
+
+describe("D1 for hands: the wand waits 450 ms, so a pinch has time to set off", () => {
+  it("a pinch does not start the wand at once", () => {
+    expect(press(ALL, "hand").down(100, 100).move(102, 100, 200).kinds()).toEqual(["press"]);
+  });
+
+  it("holding still starts the wand after 450 ms, where the hand is then", () => {
+    const g = press(ALL, "hand").down(100, 100).move(103, 100, 300).move(110, 104, 449);
+    expect(g.kinds()).toEqual(["press"]);
+    g.move(112, 104, 466);
+    expect(g.out.at(-1)).toMatchObject({ kind: "wand-start", p: [112, 104], t: 466, source: "hand" });
+    g.up(112, 104, 1200);
+    expect(g.kinds()).toEqual(["press", "wand-start", "wand-end"]);
+  });
+
+  it("pausing after the pinch and then moving more than 40 px is a stroke, with no wand first", () => {
+    const g = press(ALL, "hand").down(100, 100).move(104, 100, 200).move(120, 100, 380).move(150, 100, 420);
+    expect(g.kinds()).toEqual(["press", "stroke-start"]);
+    g.move(300, 100, 600).up(320, 100, 700);
+    expect(g.kinds()).toEqual(["press", "stroke-start", "stroke-move", "stroke-end"]);
+  });
+
+  it("hands get 40 px before a press becomes a stroke", () => {
+    expect(press(ALL, "hand").down(100, 100).move(130, 100, 100).move(130, 100, 500).kinds()).toEqual(["press", "wand-start"]);
+    expect(press(ALL, "hand").down(100, 100).move(145, 100, 100).kinds()).toEqual(["press", "stroke-start"]);
+  });
+
+  it("a move within 300 ms after the wand started still becomes a stroke; later it does not", () => {
+    const early = press(ALL, "hand").down(100, 100).move(100, 100, 450).move(150, 100, 700);
+    expect(early.kinds()).toEqual(["press", "wand-start", "stroke-start"]);
+    const late = press(ALL, "hand").down(100, 100).move(100, 100, 450).move(105, 100, 760).move(200, 100, 800).up(200, 100, 900);
+    expect(late.kinds()).toEqual(["press", "wand-start", "wand-end"]);
+  });
+
+  it("a quick pinch is the wand's tap: a small window where the pinch began", () => {
+    const g = press(ALL, "hand").down(100, 100).move(110, 100, 120).up(110, 100, 200);
+    expect(g.kinds()).toEqual(["press", "wand-start", "wand-end"]);
+    expect(g.out[1]).toMatchObject({ kind: "wand-start", p: [100, 100], t: 200 });
+  });
+
+  it("only waits when the knife is on too, and a cancel while waiting starts nothing", () => {
+    expect(press({ knife: false, wand: true, click: false }, "hand").down(100, 100).kinds()).toEqual(["press", "wand-start"]);
+    expect(press(ALL, "hand").down(100, 100).cancel(200).kinds()).toEqual(["press", "cancel"]);
   });
 });
 

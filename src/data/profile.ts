@@ -193,7 +193,7 @@ const zh = {
         open: "张开",
         pinched: "捏住",
         preview: "手势识别的摄像头画面（镜像）",
-        hint: "捏住拇指和食指就是按下：捏着划直线是刀，捏住不动是魔杖，捏一下再松开是点击",
+        hint: "捏住拇指和食指就是按下：捏住马上划直线是刀；捏住不动，等光标外的金圈转满是魔杖；捏一下再松开是点击",
         errors: {
           denied: "没有拿到摄像头权限，手势模式已关闭。可以在地址栏旁的网站设置里允许使用摄像头。",
           "no-camera": "没有找到可用的摄像头，手势模式已关闭。",
@@ -449,7 +449,7 @@ const en: typeof zh = {
         open: "Open",
         pinched: "Pinched",
         preview: "Hand-tracking camera picture (mirrored)",
-        hint: "Pinch thumb and index finger to press: pinch and draw a straight line for the knife, pinch and hold for the wand, pinch and let go to click",
+        hint: "Pinch thumb and index finger to press: pinch and draw a straight line right away for the knife; pinch and hold still until the gold ring around the cursor fills for the wand; pinch and let go to click",
         errors: {
           denied: "Camera access was blocked, so hand mode is off. Allow the camera in this site's settings next to the address bar.",
           "no-camera": "No camera was found, so hand mode is off.",

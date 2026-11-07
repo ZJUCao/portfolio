@@ -208,7 +208,7 @@ export function blockUsageLogging(): void; // see §13, P4: keeps MediaPipe's us
 ### 6.5 Gesture mode (Q11, Q13, D5)
 
 1. A "Try it with your hand" switch next to the viewport, shown only on computers (no coarse pointer). The camera and the model load only after it is turned on.
-2. The mapped area of the camera picture corresponds to the viewport, so the cursor stays inside it. A pinch is a press, and its events go to the viewport's `CutLayer` along the same path as the mouse. Pinching on a button clicks it.
+2. The mapped area of the camera picture corresponds to the viewport, so the cursor stays inside it. A pinch is a press, and its events go to the viewport's `CutLayer` along the same path as the mouse. Pinching on a button clicks it. A hand pauses after pinching before it sets off, so the wand waits 450 ms, while a gold ring fills around the cursor (§13, P4).
 3. Detection pauses when the viewport scrolls off screen; turning the switch off turns the camera off.
 4. The small camera window sits in a corner of the viewport and shows the skeleton, the mapped area and the state.
 
@@ -228,7 +228,7 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | Wand: start delay, longest hold, largest radius, smallest radius, settle after release | 120 ms, 1.6 s, 36% of the short side, 10% of the short side, 350 ms |
 | Click to cut | Line 120 ms, pause 40 ms, open 200 ms, expand 480 ms (D9) |
 | Step-through expansion | 780 ms |
-| D1 rule | Moving more than 10 px within 250 ms is a stroke; 40 px for hand gestures |
+| D1 rule | Moving more than 10 px within 250 ms is a stroke. Hands: 40 px; the wand waits 450 ms after a pinch, and a move still becomes a stroke within 300 ms after the wand starts |
 | Dust | At most 1,500 particles, canvas at no more than 2× pixel ratio |
 | Colors | Knife `--accent`; wand `--cat-engines` (`#fbbf6a`, Q10) |
 | Gestures | Pinch at 0.30, release at 0.45; mapped area with 12% margins left, right and top and 18% at the bottom; a hand missing for 300 ms is a release; One Euro 1.2 / 0.012 |
@@ -358,4 +358,5 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Tests: new `tests/cut/hand/hand.test.ts` (One Euro, the pinch check and its hysteresis, the mirrored mapping, frames to events, a release only after 300 ms without a hand, cancelling on switch-off), `fetchMediapipe.test.ts` (the SHA-256 check, the pinned version and hash, the runtime files present) and `tracker.test.ts` (the logging address answered locally, other requests passed through), plus rules for every module in `src/cut/hand` in the architecture test.
 - First-load code: gesture mode and MediaPipe download only when the switch is turned on, so the home page's first-load scripts contain neither; they are about 1.1 KB larger than in P3 (the switch and copy).
 - Tried in desktop Chromium: the switch appears; the browser built into the Claude desktop app does not let pages use the camera, so it only got as far as "camera access was blocked", turning the switch back off with the reason. On an uncommitted test page, the runtime and model loaded from this site and both GPU and CPU created a landmarker and ran one detection (about 0.2–0.8 s).
-- Not tried: actually using a camera and a hand (to be done in your own browser), phones (left out for now per Q13), Safari and Firefox.
+- Your camera test (2026-11-06): good overall, but the knife and the wand were hard to tell apart: about to cut, the space often dissolved first. Cause: a pinch started the wand at once, and a move only became a stroke if it went 40 px within 250 ms of the pinch; a hand pauses after pinching before it sets off, so by then the wand had won. Change, for hands only and only with knife and wand both on: the wand waits 450 ms after a pinch, and moving more than 40 px before then is a knife stroke; once the wand has started, such a move within 300 ms still becomes a stroke (the young hole collapses). A quick pinch and release is still the wand's tap. While the wand waits, a gold ring fills around the cursor; then the cursor becomes a gold dot (wand) or a cyan dot (knife). The hint says so and stays 8 s instead of 6. Mouse and touch are unchanged. New tests in `gesture.test.ts` and `engine.test.ts`; the ring was checked in the browser by rendering the cursor by hand. Not yet tried again with the camera.
+- Not tried: phones (left out for now per Q13), Safari and Firefox.

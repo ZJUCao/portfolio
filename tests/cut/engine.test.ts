@@ -309,3 +309,35 @@ describe("lifecycle", () => {
     expect(r.fake.pending).toBe(0);
   });
 });
+
+describe("hands: the wand waits, so a pinch has time to set off (D1)", () => {
+  it("a pinch, a pause and a straight move cut without dissolving first", async () => {
+    const r = rig();
+    r.send("down", [200, 400], "hand");
+    for (let i = 0; i < 12; i++) {
+      await r.fake.advance(33);
+      r.send("move", [200 + (i % 2), 400], "hand");
+    }
+    for (let i = 1; i <= 10; i++) {
+      await r.fake.advance(33);
+      r.send("move", [200 + 60 * i, 400], "hand");
+    }
+    r.send("up", [800, 400], "hand");
+    await r.fake.advance(1000);
+    expect(r.phases).not.toContain("growing");
+    expect(r.cut.phase).toBe("peek");
+  });
+
+  it("a pinch held still dissolves after 450 ms", async () => {
+    const r = rig();
+    r.send("down", [500, 400], "hand");
+    for (let i = 0; i < 13; i++) {
+      await r.fake.advance(33);
+      r.send("move", [500, 400], "hand");
+    }
+    expect(r.phases).not.toContain("growing");
+    await r.fake.advance(40);
+    r.send("move", [500, 400], "hand");
+    expect(r.cut.phase).toBe("growing");
+  });
+});

@@ -123,6 +123,11 @@ export const GESTURE = Object.freeze({
   strokeMovePx: 10,
   strokeMovePxHand: 40,
   strokeWindowMs: 250,
+  /** A hand pauses after pinching before it sets off, so with knife and wand both on, a pinch waits
+   *  this long before the wand starts; moving further than strokeMovePxHand meanwhile is a stroke… */
+  wandDelayMsHand: 450,
+  /** …and once the wand has started, such a move still becomes a stroke within this long. */
+  strokeWindowMsHand: 300,
   /** A release within this distance of the press is a tap (click to cut). */
   tapMovePx: 12,
   tapMovePxHand: 40,

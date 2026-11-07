@@ -5,8 +5,8 @@
 // 和鼠标走同一条路交给取景框的切口引擎（D5）。捏在取景框里的按钮上就是点它。
 // 取景框滚出屏幕时停止识别；右上角的小窗显示画面、手的骨架、映射区域和状态。画面只在浏览器里处理，不上传
 import { type RefObject, useEffect, useRef, useState } from "react";
-import { HAND } from "@/cut/constants";
-import type { Cut } from "@/cut/engine";
+import { GESTURE, HAND } from "@/cut/constants";
+import type { Cut, Phase } from "@/cut/engine";
 import type { GestureEvent } from "@/cut/gesture";
 import { createHandInput, type HandState, type Landmark } from "@/cut/hand/handInput";
 import { type HandTrackingReason, type HandTrackingStatus, startHandTracking } from "@/cut/hand/tracker";
@@ -33,7 +33,18 @@ type Props = {
   onError(message: string): void;
 };
 
-const HINT_MS = 6000;
+const HINT_MS = 8000;
+
+// 光标的样子。捏住以后、还没定是刀还是魔杖时（引擎还空闲），一圈金色在 450 ms 里转满，转满就是魔杖；
+// 这之前划出去就是刀。定下来以后：魔杖是金色实心点，刀是青色实心点
+type CursorLook = HandState | "waiting" | "wand" | "knife";
+function cursorLook(state: HandState, phase: Phase | undefined, fresh: boolean): CursorLook {
+  if (state !== "pinched" || !fresh) return state;
+  if (phase === "idle") return "waiting";
+  if (phase === "growing") return "wand";
+  if (phase === "drawing") return "knife";
+  return state;
+}
 
 // 手的 21 个关键点之间的骨头
 const BONES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]] as const;
@@ -99,6 +110,8 @@ export function HandMode({ viewport, cutRef, labels, onError }: Props) {
     let shown: HandState = "none";
     // 捏在按钮上：先记住这个按钮，松开时还在它上面就点它，不交给切口引擎
     let pressed: HTMLElement | null = null;
+    // 这一捏是不是在切口空闲时开始的（窗口开着时的一捏是穿过去或合上，不会变成刀或魔杖）
+    let fresh = false;
 
     const targetAt = (x: number, y: number) => {
       const box = viewport.getBoundingClientRect();
@@ -108,6 +121,7 @@ export function HandMode({ viewport, cutRef, labels, onError }: Props) {
     const route = (event: GestureEvent) => {
       if (event.type === "down") {
         pressed = targetAt(event.x, event.y);
+        fresh = !pressed && cutRef.current?.phase === "idle";
         if (pressed) return;
       }
       if (pressed) {
@@ -124,12 +138,12 @@ export function HandMode({ viewport, cutRef, labels, onError }: Props) {
         const result = input.frame(frame.landmarks, frame.t, frame.aspect, { width: viewport.clientWidth, height: viewport.clientHeight });
         drawPreview(canvas, frame.landmarks, result.state === "pinched");
         if (result.cursor) cursor.style.transform = `translate(${result.cursor[0].toFixed(1)}px, ${result.cursor[1].toFixed(1)}px)`;
-        cursor.dataset.state = result.state;
         if (result.state !== shown) {
           shown = result.state;
           setHand(result.state);
         }
         for (const event of result.events) route(event);
+        cursor.dataset.state = cursorLook(result.state, cutRef.current?.phase, fresh);
       },
       { signal: controller.signal, onStatus: setStatus },
     )
@@ -179,13 +193,28 @@ export function HandMode({ viewport, cutRef, labels, onError }: Props) {
           {state}
         </figcaption>
       </figure>
-      {/* 跟着手走的光标：张开时是一个圈，捏住时缩成实心点 */}
+      {/* 跟着手走的光标：张开时是一个圈；捏住后先转一圈金色（cursorLook），定下来以后缩成实心点 */}
       <span
         ref={cursorRef}
         aria-hidden
         data-state="none"
-        className="pointer-events-none absolute left-0 top-0 z-10 -ml-3 -mt-3 size-6 rounded-full border-2 border-accent transition-[width,height,margin,background-color,opacity] duration-150 data-[state=none]:opacity-30 data-[state=pinched]:-ml-1.5 data-[state=pinched]:-mt-1.5 data-[state=pinched]:size-3 data-[state=pinched]:bg-(--cat-engines) data-[state=pinched]:border-(--cat-engines)"
-      />
+        className="group pointer-events-none absolute left-0 top-0 z-10 -ml-3 -mt-3 size-6 rounded-full border-2 border-accent transition-[width,height,margin,background-color,border-color,opacity] duration-150 data-[state=none]:opacity-30 data-[state=waiting]:border-accent/35 data-[state=pinched]:-ml-1.5 data-[state=pinched]:-mt-1.5 data-[state=pinched]:size-3 data-[state=pinched]:border-(--cat-engines) data-[state=pinched]:bg-(--cat-engines) data-[state=wand]:-ml-1.5 data-[state=wand]:-mt-1.5 data-[state=wand]:size-3 data-[state=wand]:border-(--cat-engines) data-[state=wand]:bg-(--cat-engines) data-[state=knife]:-ml-1.5 data-[state=knife]:-mt-1.5 data-[state=knife]:size-3 data-[state=knife]:bg-accent"
+      >
+        <svg viewBox="0 0 24 24" className="absolute -inset-0.5 hidden size-6 -rotate-90 group-data-[state=waiting]:block">
+          <circle
+            cx="12"
+            cy="12"
+            r="11"
+            pathLength={1}
+            fill="none"
+            stroke="var(--cat-engines)"
+            strokeWidth="2"
+            strokeDasharray="1"
+            className="animate-[hand-wait_linear_forwards]"
+            style={{ animationDuration: `${GESTURE.wandDelayMsHand}ms` }}
+          />
+        </svg>
+      </span>
     </>
   );
 }
