@@ -1,6 +1,6 @@
 # Design: Space-cut transitions
 
-Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); P3 is merged (PR #7); P4 is merged (PR #8); P5 is built on the `space-cut-p5` branch, not merged, awaiting review (the browser's Back and Forward now play it too; §6.6 updated to match on 2026-11-06), see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
+Status: **Confirmed 2026-11-06**, D1–D9 and OQ-1–OQ-5 all settled as recommended; **the P0 spike is done** (§12), P0-1 and P0-2 adopted on 2026-11-06; the P1 engine is merged (PR #5); P2 is merged (PR #6); P3 is merged (PR #7); P4 is merged (PR #8); P5 is merged (PR #10), see §13 · Based on: [requirements](requirements_space_cut.md) (confirmed) · Phases: P0–P5 (§9)
 
 ## 1. Goal
 
@@ -268,7 +268,7 @@ All in `src/cut/constants.ts`. The values below are taken from the prototype, ex
 | P2 Camera AR and language switch | **Merged 2026-11-06 (PR #6), see §13.** `CutLayer`, `pageCut`, `Nav`, `HeroViewport`, `CameraAR`, copy | ~450 | F3, F8 and F9 usable |
 | P3 404, easter egg, hint | **Merged 2026-11-06 (PR #7), see §13.** The 404 client component, the portal and engineering view in `heroScene`, `hint` | ~600 | F1, F2, F4, F7, F10 and F11 usable |
 | P4 Gesture mode | **Merged 2026-11-06 (PR #8), see §13.** `hand/*`, `fetch-mediapipe`, the switch, the camera window, privacy copy | ~550 | F13 usable (computers only) |
-| P5 Project cards | **Built on the `space-cut-p5` branch (2026-11-06), not merged, see §13.** The detail page's header image and the shared-element transition, also on Back and Forward: `ProjectCover`, `CoverLink`, `CoverHistory`, `coverMorph`, `coverHistory` | ~120 (came to about 270, comments included) | F14 usable (tried in desktop Chromium only) |
+| P5 Project cards | **Merged 2026-11-06 (PR #10), see §13.** The detail page's header image and the shared-element transition, also on Back and Forward: `ProjectCover`, `CoverLink`, `CoverHistory`, `coverMorph`, `coverHistory` | ~120 (came to about 270, comments included) | F14 usable (tried in desktop Chromium only) |
 
 About 2,600 lines in total (excluding P0), not counting tests and docs. Each phase follows skeleton → tests (Red) → implementation (Green) → verification, then stops for review and updates the status in §5 of the requirements.
 
@@ -367,7 +367,7 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Your camera test (2026-11-06): good overall, but the knife and the wand were hard to tell apart: about to cut, the space often dissolved first. Cause: a pinch started the wand at once, and a move only became a stroke if it went 40 px within 250 ms of the pinch; a hand pauses after pinching before it sets off, so by then the wand had won. Change, for hands only and only with knife and wand both on: the wand waits 450 ms after a pinch, and moving more than 40 px before then is a knife stroke; once the wand has started, such a move within 300 ms still becomes a stroke (the young hole collapses). A quick pinch and release is still the wand's tap. While the wand waits, a gold ring fills around the cursor; then the cursor becomes a gold dot (wand) or a cyan dot (knife). The hint says so and stays 8 s instead of 6. Mouse and touch are unchanged. New tests in `gesture.test.ts` and `engine.test.ts`; the ring was checked in the browser by rendering the cursor by hand. You tried it again with the camera and found the 450 ms wait right.
 - Not tried: phones (left out for now per Q13), Safari and Firefox.
 
-### P5 (2026-11-06, on the `space-cut-p5` branch, not merged)
+### P5 (2026-11-06, merged as PR #10)
 
 - On the site: the project detail page has a header image above the title. It is the card's own cover (the README screenshot, or the line drawing when there is none, with the corner marks), 16:10 like the card and no wider than the summary below it (672 px). It sits outside any `Reveal` and loads at once. Clicking a project card, with the mouse or Enter, on the projects page or among the home page's featured projects, grows the card's cover into the header image in 400 ms, with the category label fading out on the way. Going back shrinks it into its card again: the detail page's "All projects" link, and the browser's Back button to the projects page or the home page; Forward grows it again. The rest of the page switches at once, as before. A page a cover shrinks back into shows its cards at once instead of fading them in (see below). With reduce motion on, the cover does not move or scale: it is already in place and crossfades for 200 ms.
 - New: `src/cut/coverMorph.ts` (the pair's name, class `cover-morph`, transition type `cover`, which traversals morph), `src/cut/coverHistory.ts` (the page on screen and the arrival flag), `src/instrumentation-client.ts` (the Back and Forward listener), `src/components/ProjectCover.tsx` (the cover the card and the header share), `src/components/CoverLink.tsx` (the card's link and "All projects") and `src/components/CoverHistory.tsx` (renders nothing, in the `[lang]` layout). Changed: `ProjectCard.tsx`, `src/app/[lang]/projects/[slug]/page.tsx`, `src/app/[lang]/layout.tsx`, `Reveal.tsx`, `CoverImage.tsx` (a `priority` prop for the header) and `globals.css`.
@@ -394,6 +394,6 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
   - The language switch on the projects and detail pages: the cut as before.
   - An emulated phone width of 375 px: the morph plays, the header image is full width, no horizontal scroll (before the Back change; not repeated).
   - Reduce motion: the rule inside `@media (prefers-reduced-motion: reduce)` injected by script, since the pane cannot emulate the media query for CSS (before the Back change; not repeated).
-- Not tried: phones (including Back by swiping), Safari, Firefox, the system's own reduce-motion setting, the deployed site (not deployed yet), and clicking more than 5 minutes after loading.
+- Not tried: phones (including Back by swiping), Safari, Firefox, the system's own reduce-motion setting, the deployed site (deployed with PR #10, not tried there), and clicking more than 5 minutes after loading.
 - For review: the header image keeps the card's 16:10, so the morph is a pure scale and the side-by-side screenshots keep the card's crop of their right half. On a desktop that makes it 420 px tall above the title.
 - When testing the static build: serve the per-segment prefetch paths the way Vercel does (above), or the morph is skipped once the page has been open for a while.
