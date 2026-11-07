@@ -145,7 +145,7 @@ On 2026-11-07 you tried it on the deployed site: Chrome or Edge and Safari on a 
 ## 6. Non-functional requirements
 
 ### Speed
-- A click-triggered transition (F3) takes no more than 1 s in total. The prototype takes about 1.04 s, so it needs trimming.
+- A click-triggered transition (F3) takes no more than 1 s in total. On the site it is set to 840 ms (design doc D9: a 120 ms line, a 40 ms pause, 200 ms to open, 480 ms to expand); the prototype took about 1.04 s.
 - The step-through expansion takes no more than 0.8 s. The parts the visitor controls (drawing, holding) have no limit.
 - Animations hold 60 fps on a mid-range phone:
   - The number of dust particles is capped (1,500 in the prototype).
