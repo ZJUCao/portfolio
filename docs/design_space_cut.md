@@ -397,3 +397,8 @@ Checked on the `spike/space-cut-p0` branch with throwaway pages `/[lang]/spike/{
 - Not tried: phones (including Back by swiping), Safari, Firefox, the system's own reduce-motion setting, the deployed site (deployed with PR #10, not tried there), and clicking more than 5 minutes after loading.
 - For review: the header image keeps the card's 16:10, so the morph is a pure scale and the side-by-side screenshots keep the card's crop of their right half. On a desktop that makes it 420 px tall above the title.
 - When testing the static build: serve the per-segment prefetch paths the way Vercel does (above), or the morph is skipped once the page has been open for a while.
+
+### Your acceptance round (2026-11-07)
+
+- You tried the deployed site: Chrome or Edge and Safari on a computer, and an iPhone, covering the language switch, camera AR, the home page viewport's easter egg, the 404 page and the project card growing into the header image, plus keyboard use, and found no major problems. Of the "Not tried" items under P2–P5 above, the iPhone, Safari and the deployed site have now been tried.
+- Still not tried: a real Android Chrome device, Firefox, and the system's own reduce-motion setting. Gesture mode was not part of this round.
